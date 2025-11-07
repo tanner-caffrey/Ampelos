@@ -1,0 +1,9 @@
+{
+  "name": "calculator",
+  "version": "1.0.0",
+  "provides": ["tool"],
+  "dependencies": [],
+  "advertise": true,
+  "description": "Basic calculator tool for arithmetic operations"
+}
+

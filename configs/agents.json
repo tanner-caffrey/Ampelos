@@ -1,0 +1,16 @@
+{
+  "agents": {
+    "agent-123e4567": {
+      "name": "CompanionBot",
+      "enabled": true,
+      "modules": {
+        "inventory": {
+          "lazy": false,
+          "max_items": 100
+        },
+        "calculator": {}
+      }
+    }
+  }
+}
+

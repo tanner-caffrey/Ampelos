@@ -1,0 +1,24 @@
+{
+  "name": "inventory",
+  "version": "1.0.0",
+  "provides": ["tool", "service"],
+  "dependencies": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max_items": {
+        "type": "integer",
+        "default": 50,
+        "description": "Maximum number of items in inventory"
+      },
+      "lazy": {
+        "type": "boolean",
+        "default": true,
+        "description": "Whether to lazy-load the service"
+      }
+    }
+  },
+  "advertise": true,
+  "description": "Inventory management system with persistent state"
+}
+

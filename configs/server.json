@@ -1,0 +1,8 @@
+{
+  "database_path": "storage/ampelos.db.json",
+  "agents_config_path": "configs/agents.json",
+  "logging": {
+    "level": "info"
+  }
+}
+
