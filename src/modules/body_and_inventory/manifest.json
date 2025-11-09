@@ -1,0 +1,63 @@
+{
+  "id": "body_and_inventory",
+  "name": "Body and Inventory",
+  "version": "0.1.0",
+  "description": "Body parts and inventory management with Letta memory integration",
+  "type": "service",
+  "dependencies": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "default_body_parts": {
+        "type": "object",
+        "description": "Default body parts to initialize for new agents",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "descriptors": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "default": {
+          "head": {
+            "descriptors": {}
+          },
+          "face": {
+            "descriptors": {}
+          },
+          "eyes": {
+            "descriptors": {}
+          },
+          "hair": {
+            "descriptors": {}
+          },
+          "torso": {
+            "descriptors": {}
+          },
+          "arms": {
+            "descriptors": {}
+          },
+          "hands": {
+            "descriptors": {}
+          },
+          "legs": {
+            "descriptors": {}
+          },
+          "feet": {
+            "descriptors": {}
+          }
+        }
+      },
+      "max_inventory_items": {
+        "type": "number",
+        "description": "Maximum number of items allowed in inventory",
+        "default": 100
+      }
+    },
+    "additionalProperties": false
+  }
+}
