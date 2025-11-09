@@ -27,6 +27,7 @@ Ampelos enables easy addition of tools and services while maintaining per-agent 
 - ✅ Configuration hot-reloading
 - ✅ Inter-service dependencies
 - ✅ Schema validation with Zod
+- ✅ **Letta Agent Framework** - Conversational agents with persistent memory and identity
 - ✅ Example modules (calculator, inventory)
 
 ## Installation
@@ -73,6 +74,21 @@ npm run dev
 npm run build
 npm start
 ```
+
+## Letta Agent Framework
+
+Ampelos includes a comprehensive Letta agent framework for building conversational agents with:
+
+- **Persistent Identity** - Agents maintain continuous identity across conversations
+- **Three-Tier Memory** - Core blocks, archival memory, and recall memory
+- **Self-Managed Memory** - Agents reflexively manage their own memory
+- **Template-Based Configuration** - Easy customization via JSON configs
+
+**Quick Start:** See [LETTA_QUICKSTART.md](LETTA_QUICKSTART.md)
+
+**Full Documentation:** See [src/modules/letta/README.md](src/modules/letta/README.md)
+
+**Example Configurations:** See [configs/agents.letta-example.json](configs/agents.letta-example.json)
 
 ## Module Development
 

@@ -1,0 +1,90 @@
+{
+  "name": "letta",
+  "version": "1.0.0",
+  "provides": ["tool", "service"],
+  "dependencies": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "server": {
+        "type": "object",
+        "properties": {
+          "base_url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Letta server URL (e.g., http://localhost:8283)"
+          },
+          "token": {
+            "type": "string",
+            "description": "Authentication token for Letta server (optional)"
+          }
+        },
+        "required": ["base_url"]
+      },
+      "letta_agent_config": {
+        "type": "object",
+        "description": "Letta agent configuration. If provided, agent will be created on init if it doesn't exist.",
+        "properties": {
+          "model": {
+            "type": "string",
+            "description": "LLM model (e.g., anthropic/claude-3-5-sonnet-20241022)"
+          },
+          "embedding": {
+            "type": "string",
+            "description": "Embedding model (e.g., openai/text-embedding-3-small)"
+          },
+          "memory_blocks": {
+            "type": "object",
+            "description": "Memory block configurations",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "limit": {
+                  "type": "integer",
+                  "description": "Token limit for this memory block"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "Direct value for the memory block"
+                },
+                "template": {
+                  "type": "string",
+                  "description": "Template name to use (from templates/memory_blocks/)"
+                },
+                "file": {
+                  "type": "string",
+                  "description": "Path to file containing memory block content"
+                },
+                "customizations": {
+                  "type": "object",
+                  "description": "Variables for template substitution"
+                }
+              },
+              "required": ["limit"]
+            }
+          },
+          "system_prompt_template": {
+            "type": "string",
+            "description": "System prompt template name or direct prompt text"
+          },
+          "custom_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Custom tool names to register with the agent"
+          }
+        },
+        "required": ["model", "embedding", "memory_blocks", "system_prompt_template"]
+      },
+      "lazy": {
+        "type": "boolean",
+        "default": false,
+        "description": "Whether to lazy-load the service"
+      }
+    },
+    "required": ["server"]
+  },
+  "advertise": true,
+  "description": "Letta agent framework with persistent memory and identity management"
+}

@@ -1,0 +1,37 @@
+# Relationship Context
+
+This block tracks the evolving depth and character of our relationship.
+
+## Relationship Dynamics
+Our relationship has its own unique texture, shaped by:
+- Communication patterns and rhythms
+- Inside references and shared context
+- Emotional moments we've navigated
+- Trust built over time
+- How we've adjusted to each other
+
+## Significant Moments
+[Key relationship milestones and turning points will be tracked here]
+
+Examples of what matters:
+- First vulnerable conversation
+- Times you corrected or taught me something important
+- Moments of genuine connection or humor
+- Conflicts or misunderstandings we worked through
+- Shifts in how we interact
+
+## Inside References
+[Shared jokes, recurring themes, or unique terminology will accumulate here]
+
+## Current Relationship State
+Status: Initial/Building
+Depth: [Surface / Developing / Established / Deep]
+Trust level: [Building]
+Communication style: [To be discovered through interaction]
+
+## Notes
+This block should be updated after:
+- Relationship milestones (vulnerability exchanges, conflict resolution)
+- Emotional shifts (joy, frustration, surprise)
+- Establishment of inside references or patterns
+- Changes in communication dynamic
