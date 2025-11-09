@@ -20,8 +20,7 @@ The Letta module integrates Letta AI's agent framework into Ampelos, providing:
 src/modules/letta/
 ├── service.ts              # Main service (agent lifecycle management)
 ├── client.ts               # Letta SDK client wrapper
-├── tool.ts                 # MCP tools for agent interaction
-├── custom-tools.ts         # Custom tools for agent self-management
+├── tool.ts                 # MCP tools for external agent interaction
 ├── manifest.json           # Module metadata and config schema
 ├── templates/
 │   ├── memory_blocks/      # Memory block templates
@@ -101,8 +100,7 @@ Define agent memory and behavior:
         "value": "Name: Tanner\\nInterests: AI, D&D, photography"
       }
     },
-    "system_prompt_template": "conversational_companion",
-    "custom_tools": ["reflect_and_commit_memory"]
+    "system_prompt_template": "conversational_companion"
   }
 }
 ```
@@ -156,9 +154,23 @@ Load content from an external file:
 }
 ```
 
-## Available MCP Tools
+## Agent Memory Tools
 
-### Agent Interaction Tools
+### Built-in Letta Agent Tools
+
+Letta agents are created with the following **built-in tools** for self-managing memory:
+
+- **`send_message`** - Generate messages to send to users
+- **`archival_memory_search`** - Search long-term archival memory
+- **`archival_memory_insert`** - Insert new information into archival memory
+- **`conversation_search`** - Search recent conversation history (recall memory)
+- **Core memory tools** - Edit memory blocks (identity, persona, human, etc.)
+
+These tools are **automatically attached** to every Letta agent and are used BY the agent autonomously to manage its own memory. The system prompt guides when and how to use them.
+
+### MCP Tools for External Interaction
+
+These MCP tools are exposed by Ampelos for **external systems** to interact with the agent:
 
 **`letta_chat`** - Send a message to the agent
 ```typescript
@@ -180,21 +192,6 @@ Load content from an external file:
 }
 ```
 
-**`letta_search_archival`** - Search long-term memory
-```typescript
-{
-  query: string,  // Search query
-  page?: number   // Page number (default: 0)
-}
-```
-
-**`letta_insert_archival`** - Add to archival memory
-```typescript
-{
-  content: string  // Content with tags (e.g., "Text #tag1 #tag2")
-}
-```
-
 **`letta_get_messages`** - Get conversation history
 ```typescript
 {
@@ -207,43 +204,7 @@ Load content from an external file:
 {}  // No parameters
 ```
 
-### Custom Agent Self-Management Tools
-
-These tools are available TO the Letta agent for managing its own memory:
-
-**`reflect_and_commit_memory`** - Reflect and commit insights
-```typescript
-{
-  reflection: string,                    // Reflection with tags
-  memory_block_updates?: {               // Optional core block updates
-    identity?: string,
-    relationship_context?: string
-  }
-}
-```
-
-**`quick_memory_note`** - Store factual notes quickly
-```typescript
-{
-  note: string  // Factual note with tags
-}
-```
-
-**`update_identity`** - Update identity block with reflection
-```typescript
-{
-  updated_identity: string,  // New identity content
-  reflection: string         // Why it changed
-}
-```
-
-**`update_relationship`** - Update relationship context with reflection
-```typescript
-{
-  updated_relationship: string,  // New relationship content
-  reflection: string             // What changed relationally
-}
-```
+**Note:** These are for external access. Agents use their own built-in tools for memory management.
 
 ## Memory Tags
 

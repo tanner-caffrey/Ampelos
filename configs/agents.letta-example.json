@@ -34,13 +34,7 @@
                 "value": "Name: Tanner\nInterests: AI, D&D, photography"
               }
             },
-            "system_prompt_template": "conversational_companion",
-            "custom_tools": [
-              "reflect_and_commit_memory",
-              "quick_memory_note",
-              "update_identity",
-              "update_relationship"
-            ]
+            "system_prompt_template": "conversational_companion"
           }
         }
       }

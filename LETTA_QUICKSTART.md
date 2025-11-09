@@ -58,13 +58,7 @@ Create or modify `configs/agents.json`:
                 "value": "Name: Your Name\\nInterests: Your interests here"
               }
             },
-            "system_prompt_template": "conversational_companion",
-            "custom_tools": [
-              "reflect_and_commit_memory",
-              "quick_memory_note",
-              "update_identity",
-              "update_relationship"
-            ]
+            "system_prompt_template": "conversational_companion"
           }
         }
       }
@@ -111,15 +105,7 @@ Use any MCP client (like Claude Desktop) to call the tools:
 }
 ```
 
-**Search archival memory:**
-```json
-{
-  "tool": "letta_search_archival",
-  "params": {
-    "query": "relationship-milestone"
-  }
-}
-```
+**Note:** Agents can search their own archival memory using the built-in `archival_memory_search` tool. The MCP tools above are for external interaction with the agent.
 
 ## Configuration Options
 
@@ -170,23 +156,27 @@ Use any MCP client (like Claude Desktop) to call the tools:
 **System Prompts:**
 - `conversational_companion` - Memory-focused conversational agent
 
-## Available MCP Tools
+## Available Tools
 
-### Agent Interaction
+### Built-in Agent Tools (Letta)
+
+Letta agents automatically have these **built-in tools** for self-managing memory:
+- `send_message` - Generate messages to users
+- `archival_memory_search` - Search long-term memory
+- `archival_memory_insert` - Insert into long-term memory
+- `conversation_search` - Search recent conversation history
+- Core memory tools - Edit memory blocks (identity, persona, human, etc.)
+
+These are used BY the agent autonomously based on the system prompt guidance.
+
+### MCP Tools (External Interaction)
+
+These Ampelos MCP tools are for **external systems** to interact with agents:
 - `letta_chat` - Send messages and get responses
 - `letta_get_memory` - View core memory blocks
 - `letta_update_memory` - Update a memory block
-- `letta_search_archival` - Search long-term memory
-- `letta_insert_archival` - Add to archival memory
 - `letta_get_messages` - Get conversation history
 - `letta_get_agent_info` - Get agent metadata
-
-### Agent Self-Management
-These tools are available TO the Letta agent:
-- `reflect_and_commit_memory` - Reflect and store insights
-- `quick_memory_note` - Store quick facts
-- `update_identity` - Update identity block
-- `update_relationship` - Update relationship context
 
 ## Memory Tags
 
