@@ -1,29 +1,28 @@
 /**
  * Letta Client Wrapper
  *
- * Handles connection to local Letta server and provides
- * methods for agent lifecycle management.
+ * Handles connection to Letta server and provides
+ * methods for agent lifecycle management using the official Letta Node SDK.
  */
 
-import { Letta } from 'letta';
+import { LettaClient, Letta } from '@letta-ai/letta-client';
 
 export interface LettaConfig {
-  base_url: string;
+  baseUrl: string;
   token?: string;
 }
 
 export interface MemoryBlock {
-  name: string;
+  label: string;
   value: string;
-  limit: number;
+  limit?: number;
 }
 
 export interface CreateAgentOptions {
   name: string;
   model: string;
-  embedding_model: string;
-  system_prompt: string;
-  memory_blocks: MemoryBlock[];
+  embedding: string;
+  memoryBlocks: MemoryBlock[];
   tools?: string[];
 }
 
@@ -31,35 +30,28 @@ export interface AgentInfo {
   id: string;
   name: string;
   model: string;
-  embedding_model: string;
+  embedding: string;
   created_at: string;
-  last_updated: string;
-}
-
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: string;
 }
 
 export interface ChatResponse {
-  messages: ChatMessage[];
+  messages: Letta.LettaResponse[];
   usage?: {
-    input_tokens: number;
-    output_tokens: number;
+    step_count: number;
+    total_tokens?: number;
   };
 }
 
 /**
  * Letta Client wrapper for managing agents
  */
-export class LettaClient {
-  private client: Letta;
+export class LettaClientWrapper {
+  private client: LettaClient;
 
   constructor(config: LettaConfig) {
-    this.client = new Letta({
-      baseURL: config.base_url,
-      token: config.token || ''
+    this.client = new LettaClient({
+      baseUrl: config.baseUrl,
+      token: config.token
     });
   }
 
@@ -68,10 +60,10 @@ export class LettaClient {
    */
   async agentExists(agentId: string): Promise<boolean> {
     try {
-      await this.client.agents.get(agentId);
+      await this.client.agents.retrieve(agentId);
       return true;
     } catch (error: any) {
-      if (error.status === 404) {
+      if (error.status === 404 || error.statusCode === 404) {
         return false;
       }
       throw error;
@@ -83,14 +75,13 @@ export class LettaClient {
    */
   async getAgent(agentId: string): Promise<AgentInfo> {
     try {
-      const agent = await this.client.agents.get(agentId);
+      const agent = await this.client.agents.retrieve(agentId);
       return {
         id: agent.id,
         name: agent.name,
-        model: agent.llm_config?.model || 'unknown',
-        embedding_model: agent.embedding_config?.embedding_model || 'unknown',
-        created_at: agent.created_at || '',
-        last_updated: agent.last_updated_at || ''
+        model: agent.llmConfig?.model || 'unknown',
+        embedding: agent.embeddingConfig?.embeddingModel || 'unknown',
+        created_at: agent.createdAt?.toString() || ''
       };
     } catch (error: any) {
       throw new Error(`Failed to get agent ${agentId}: ${error.message}`);
@@ -99,35 +90,33 @@ export class LettaClient {
 
   /**
    * Create a new agent
+   *
+   * Note: Agents are created with default tools including:
+   * - send_message: Generate messages to user
+   * - Core memory tools: Edit memory blocks
+   * - archival_memory_search/insert: Long-term memory
+   * - conversation_search: Search conversation history
    */
   async createAgent(options: CreateAgentOptions): Promise<string> {
     try {
-      // Build memory blocks
-      const memory: any = {};
-      for (const block of options.memory_blocks) {
-        memory[block.name] = {
+      const createParams: Letta.CreateAgentRequest = {
+        name: options.name,
+        model: options.model,
+        embedding: options.embedding,
+        memoryBlocks: options.memoryBlocks.map(block => ({
+          label: block.label,
           value: block.value,
           limit: block.limit
-        };
+        }))
+      };
+
+      // Attach additional tools if specified
+      // Note: Built-in memory tools are attached by default
+      if (options.tools && options.tools.length > 0) {
+        createParams.tools = options.tools;
       }
 
-      // Create agent
-      const agent = await this.client.agents.create({
-        name: options.name,
-        llm_config: {
-          model: options.model,
-          context_window: 128000
-        },
-        embedding_config: {
-          embedding_model: options.embedding_model,
-          embedding_dim: 1536,
-          embedding_chunk_size: 300
-        },
-        system: options.system_prompt,
-        memory,
-        tools: options.tools || []
-      });
-
+      const agent = await this.client.agents.create(createParams);
       return agent.id;
     } catch (error: any) {
       throw new Error(`Failed to create agent: ${error.message}`);
@@ -135,37 +124,42 @@ export class LettaClient {
   }
 
   /**
-   * Update agent memory blocks
+   * Update a memory block
    */
-  async updateMemory(agentId: string, blockName: string, value: string): Promise<void> {
+  async updateMemoryBlock(agentId: string, blockLabel: string, value: string): Promise<void> {
     try {
-      await this.client.agents.updateMemory(agentId, {
-        [blockName]: value
+      // Retrieve all blocks to find the one we want
+      const blocks = await this.client.agents.blocks.list(agentId);
+      const block = blocks.find((b: any) => b.label === blockLabel);
+
+      if (!block) {
+        throw new Error(`Memory block "${blockLabel}" not found`);
+      }
+
+      // Update it
+      await this.client.agents.blocks.update(agentId, block.id, {
+        value
       });
     } catch (error: any) {
-      throw new Error(`Failed to update memory for agent ${agentId}: ${error.message}`);
+      throw new Error(`Failed to update memory block ${blockLabel} for agent ${agentId}: ${error.message}`);
     }
   }
 
   /**
-   * Get agent memory blocks
+   * Get all memory blocks for an agent
    */
-  async getMemory(agentId: string): Promise<Record<string, string>> {
+  async getMemoryBlocks(agentId: string): Promise<Record<string, string>> {
     try {
-      const agent = await this.client.agents.get(agentId);
+      const blocks = await this.client.agents.blocks.list(agentId);
       const memory: Record<string, string> = {};
 
-      if (agent.memory) {
-        for (const [key, value] of Object.entries(agent.memory)) {
-          if (typeof value === 'object' && value !== null && 'value' in value) {
-            memory[key] = (value as any).value;
-          }
-        }
+      for (const block of blocks) {
+        memory[block.label] = block.value;
       }
 
       return memory;
     } catch (error: any) {
-      throw new Error(`Failed to get memory for agent ${agentId}: ${error.message}`);
+      throw new Error(`Failed to get memory blocks for agent ${agentId}: ${error.message}`);
     }
   }
 
@@ -174,32 +168,24 @@ export class LettaClient {
    */
   async sendMessage(agentId: string, message: string): Promise<ChatResponse> {
     try {
-      const response = await this.client.agents.messages.create(agentId, {
+      const request: Letta.SendMessageRequest = {
         messages: [
           {
             role: 'user',
-            content: message
+            text: message
           }
         ]
-      });
+      };
 
-      // Parse response messages
-      const messages: ChatMessage[] = [];
-      if (response.messages) {
-        for (const msg of response.messages) {
-          messages.push({
-            role: msg.role as 'user' | 'assistant' | 'system',
-            content: msg.content || '',
-            timestamp: msg.created_at
-          });
-        }
-      }
+      const response = await this.client.agents.messages.sendMessage(agentId, request);
 
       return {
-        messages,
+        messages: response.messages || [],
         usage: response.usage ? {
-          input_tokens: response.usage.prompt_tokens || 0,
-          output_tokens: response.usage.completion_tokens || 0
+          step_count: response.usage.stepCount || 0,
+          total_tokens: response.usage.completionTokens ?
+            (response.usage.completionTokens + (response.usage.promptTokens || 0)) :
+            undefined
         } : undefined
       };
     } catch (error: any) {
@@ -208,55 +194,18 @@ export class LettaClient {
   }
 
   /**
-   * Search archival memory
-   */
-  async searchArchival(agentId: string, query: string, page: number = 0): Promise<any[]> {
-    try {
-      const response = await this.client.agents.archival.search(agentId, {
-        query,
-        page
-      });
-
-      return response.results || [];
-    } catch (error: any) {
-      throw new Error(`Failed to search archival memory for agent ${agentId}: ${error.message}`);
-    }
-  }
-
-  /**
-   * Insert into archival memory
-   */
-  async insertArchival(agentId: string, content: string): Promise<void> {
-    try {
-      await this.client.agents.archival.insert(agentId, {
-        content
-      });
-    } catch (error: any) {
-      throw new Error(`Failed to insert into archival memory for agent ${agentId}: ${error.message}`);
-    }
-  }
-
-  /**
    * Get conversation messages
+   *
+   * Note: Agents can search their own conversation history using
+   * the built-in conversation_search tool
    */
-  async getMessages(agentId: string, limit: number = 50): Promise<ChatMessage[]> {
+  async getMessages(agentId: string, limit: number = 50): Promise<Letta.LettaResponse[]> {
     try {
       const response = await this.client.agents.messages.list(agentId, {
         limit
       });
 
-      const messages: ChatMessage[] = [];
-      if (response.messages) {
-        for (const msg of response.messages) {
-          messages.push({
-            role: msg.role as 'user' | 'assistant' | 'system',
-            content: msg.content || '',
-            timestamp: msg.created_at
-          });
-        }
-      }
-
-      return messages;
+      return response;
     } catch (error: any) {
       throw new Error(`Failed to get messages for agent ${agentId}: ${error.message}`);
     }
@@ -278,25 +227,50 @@ export class LettaClient {
    */
   async listAgents(): Promise<AgentInfo[]> {
     try {
-      const response = await this.client.agents.list();
-      const agents: AgentInfo[] = [];
+      const agents = await this.client.agents.list();
 
-      if (response.agents) {
-        for (const agent of response.agents) {
-          agents.push({
-            id: agent.id,
-            name: agent.name,
-            model: agent.llm_config?.model || 'unknown',
-            embedding_model: agent.embedding_config?.embedding_model || 'unknown',
-            created_at: agent.created_at || '',
-            last_updated: agent.last_updated_at || ''
-          });
-        }
-      }
-
-      return agents;
+      return agents.map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        model: agent.llmConfig?.model || 'unknown',
+        embedding: agent.embeddingConfig?.embeddingModel || 'unknown',
+        created_at: agent.createdAt?.toString() || ''
+      }));
     } catch (error: any) {
       throw new Error(`Failed to list agents: ${error.message}`);
     }
+  }
+
+  /**
+   * Attach a tool to an agent
+   */
+  async attachTool(agentId: string, toolId: string): Promise<void> {
+    try {
+      await this.client.agents.tools.attach(agentId, toolId);
+    } catch (error: any) {
+      throw new Error(`Failed to attach tool ${toolId} to agent ${agentId}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a custom tool from Python source code
+   */
+  async createTool(sourceCode: string, name?: string): Promise<string> {
+    try {
+      const tool = await this.client.tools.upsert({
+        sourceCode,
+        name
+      });
+      return tool.id;
+    } catch (error: any) {
+      throw new Error(`Failed to create tool: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get the raw client for advanced operations
+   */
+  getRawClient(): LettaClient {
+    return this.client;
   }
 }

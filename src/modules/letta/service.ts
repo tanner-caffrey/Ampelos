@@ -6,7 +6,7 @@
 
 import type { AgentId } from '../../types/agent.js';
 import type { BaseService, ServiceContext } from '../../types/service.js';
-import { LettaClient, AgentInfo } from './client.js';
+import { LettaClientWrapper, AgentInfo } from './client.js';
 import { buildAgentConfig, validateLettaConfig } from './utils/memory-builder.js';
 import type { LettaModuleConfig, LettaAgentConfig } from './utils/config-validator.js';
 
@@ -18,7 +18,7 @@ interface LettaServiceState extends Record<string, unknown> {
 }
 
 export class LettaService implements BaseService {
-  private client?: LettaClient;
+  private client?: LettaClientWrapper;
   private agentId?: AgentId;
   private config?: LettaModuleConfig;
   private context?: ServiceContext;
@@ -40,8 +40,8 @@ export class LettaService implements BaseService {
     this.context = context;
 
     // Initialize Letta client
-    this.client = new LettaClient({
-      base_url: this.config.server.base_url,
+    this.client = new LettaClientWrapper({
+      baseUrl: this.config.server.base_url,
       token: this.config.server.token
     });
 
@@ -116,7 +116,7 @@ export class LettaService implements BaseService {
   /**
    * Get the Letta client
    */
-  getClient(): LettaClient {
+  getClient(): LettaClientWrapper {
     if (!this.client) {
       throw new Error('Letta service not initialized');
     }
@@ -142,40 +142,18 @@ export class LettaService implements BaseService {
       throw new Error('Letta agent not initialized');
     }
 
-    return await this.client.getMemory(this.state.letta_agent_id);
+    return await this.client.getMemoryBlocks(this.state.letta_agent_id);
   }
 
   /**
    * Update a memory block
    */
-  async updateMemory(blockName: string, value: string): Promise<void> {
+  async updateMemory(blockLabel: string, value: string): Promise<void> {
     if (!this.client || !this.state.letta_agent_id) {
       throw new Error('Letta agent not initialized');
     }
 
-    await this.client.updateMemory(this.state.letta_agent_id, blockName, value);
-  }
-
-  /**
-   * Search archival memory
-   */
-  async searchArchival(query: string, page: number = 0): Promise<any[]> {
-    if (!this.client || !this.state.letta_agent_id) {
-      throw new Error('Letta agent not initialized');
-    }
-
-    return await this.client.searchArchival(this.state.letta_agent_id, query, page);
-  }
-
-  /**
-   * Insert into archival memory
-   */
-  async insertArchival(content: string): Promise<void> {
-    if (!this.client || !this.state.letta_agent_id) {
-      throw new Error('Letta agent not initialized');
-    }
-
-    await this.client.insertArchival(this.state.letta_agent_id, content);
+    await this.client.updateMemoryBlock(this.state.letta_agent_id, blockLabel, value);
   }
 
   /**
@@ -202,8 +180,8 @@ export class LettaService implements BaseService {
     // Check if server config changed
     if (old.server.base_url !== neu.server.base_url || old.server.token !== neu.server.token) {
       console.log('[Letta] Server config changed, reconnecting...');
-      this.client = new LettaClient({
-        base_url: neu.server.base_url,
+      this.client = new LettaClientWrapper({
+        baseUrl: neu.server.base_url,
         token: neu.server.token
       });
     }

@@ -31,11 +31,11 @@ export async function buildMemoryBlocks(
 ): Promise<MemoryBlock[]> {
   const blocks: MemoryBlock[] = [];
 
-  for (const [name, blockConfig] of Object.entries(config)) {
+  for (const [label, blockConfig] of Object.entries(config)) {
     const value = await processMemoryBlock(blockConfig);
 
     blocks.push({
-      name,
+      label,
       value,
       limit: blockConfig.limit
     });
@@ -46,6 +46,7 @@ export async function buildMemoryBlocks(
 
 /**
  * Build complete agent configuration from config
+ * Returns params ready for Letta SDK createAgent()
  */
 export async function buildAgentConfig(
   agentName: string,
@@ -53,26 +54,22 @@ export async function buildAgentConfig(
 ): Promise<{
   name: string;
   model: string;
-  embedding_model: string;
-  system_prompt: string;
-  memory_blocks: MemoryBlock[];
-  tools: string[];
+  embedding: string;
+  memoryBlocks: MemoryBlock[];
+  tools?: string[];
 }> {
   // Build memory blocks
   const memoryBlocks = await buildMemoryBlocks(config.memory_blocks);
 
-  // Build system prompt
-  const systemPrompt = await processSystemPrompt(config.system_prompt_template, {
-    agent_name: agentName
-  });
+  // Note: System prompt can be passed via a memory block or separately
+  // For now, we handle it via template rendering in memory blocks
 
   return {
     name: agentName,
     model: config.model,
-    embedding_model: config.embedding,
-    system_prompt: systemPrompt,
-    memory_blocks: memoryBlocks,
-    tools: config.custom_tools || []
+    embedding: config.embedding,
+    memoryBlocks,
+    tools: config.custom_tools && config.custom_tools.length > 0 ? config.custom_tools : undefined
   };
 }
 

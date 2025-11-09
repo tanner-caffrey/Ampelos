@@ -379,17 +379,13 @@ Last Updated: ${info.last_updated}
   }
 };
 
-// Import custom tools
-import { customTools } from './custom-tools.js';
-
-// Export all tools (standard + custom)
+// Export all tools
+// Note: Letta agents have built-in memory tools (archival_memory_search/insert, conversation_search)
+// These MCP tools are for external interaction with the agent
 export const tools: ToolDefinition[] = [
   letta_chat,
   letta_get_memory,
   letta_update_memory,
-  letta_search_archival,
-  letta_insert_archival,
   letta_get_messages,
-  letta_get_agent_info,
-  ...customTools
+  letta_get_agent_info
 ];
