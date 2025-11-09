@@ -4,7 +4,7 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import type {
+import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
@@ -87,11 +87,9 @@ export class MCPServer {
       const { name, arguments: args } = request.params;
 
       // Extract agent_id from request metadata
-      // For now, we'll try to get it from args or use a default
-      // In production, this should come from MCP request headers/metadata
       let agentId: AgentId | null = null;
 
-      // Try to extract from args if provided
+      // Strategy 1: Try to extract from args if provided
       if (args && typeof args === 'object' && 'agent_id' in args) {
         try {
           agentId = createAgentId(args.agent_id as string);
@@ -100,19 +98,36 @@ export class MCPServer {
         }
       }
 
-      // If no agent_id in args, we need to get it from request context
-      // This is a limitation - MCP SDK may need custom transport to pass headers
-      // For now, return error if agent_id not provided
+      // Strategy 2: If no agent_id in args, check if there's only one enabled agent
       if (!agentId) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'Error: agent_id must be provided in tool arguments or request headers',
-            },
-          ],
-          isError: true,
-        };
+        const enabledAgents = this.agentRegistry.getEnabledAgents();
+
+        if (enabledAgents.length === 1) {
+          // Only one agent enabled, use it by default
+          agentId = enabledAgents[0].agent_id;
+          console.log(`[MCP Server] Defaulting to single enabled agent: ${agentId}`);
+        } else if (enabledAgents.length === 0) {
+          return {
+            content: [
+              {
+                type: 'text',
+                text: 'Error: No enabled agents found',
+              },
+            ],
+            isError: true,
+          };
+        } else {
+          // Multiple agents enabled, cannot determine which to use
+          return {
+            content: [
+              {
+                type: 'text',
+                text: `Error: Multiple agents enabled (${enabledAgents.map(a => a.agent_id).join(', ')}). Please specify 'agent_id' in tool arguments.`,
+              },
+            ],
+            isError: true,
+          };
+        }
       }
 
       // Verify agent exists and is enabled
