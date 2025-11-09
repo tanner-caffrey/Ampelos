@@ -89,7 +89,7 @@ export class MCPServer {
       // Extract agent_id from request metadata
       let agentId: AgentId | null = null;
 
-      // Strategy 1: Try to extract from args if provided
+      // Strategy 1: Try to extract from args if provided explicitly
       if (args && typeof args === 'object' && 'agent_id' in args) {
         try {
           agentId = createAgentId(args.agent_id as string);
@@ -98,7 +98,16 @@ export class MCPServer {
         }
       }
 
-      // Strategy 2: If no agent_id in args, check if there's only one enabled agent
+      // Strategy 2: Try to map from Letta agent ID if provided
+      if (!agentId && args && typeof args === 'object' && 'letta_agent_id' in args) {
+        const lettaAgentId = args.letta_agent_id as string;
+        agentId = await this.findAgentByLettaId(lettaAgentId);
+        if (agentId) {
+          console.log(`[MCP Server] Mapped Letta agent ${lettaAgentId} to Ampelos agent ${agentId}`);
+        }
+      }
+
+      // Strategy 3: If no agent_id found, check if there's only one enabled agent
       if (!agentId) {
         const enabledAgents = this.agentRegistry.getEnabledAgents();
 
@@ -122,7 +131,7 @@ export class MCPServer {
             content: [
               {
                 type: 'text',
-                text: `Error: Multiple agents enabled (${enabledAgents.map(a => a.agent_id).join(', ')}). Please specify 'agent_id' in tool arguments.`,
+                text: `Error: Multiple agents enabled (${enabledAgents.map(a => a.agent_id).join(', ')}). Please specify 'agent_id' or 'letta_agent_id' in tool arguments.`,
               },
             ],
             isError: true,
@@ -260,6 +269,40 @@ export class MCPServer {
         };
       }
     });
+  }
+
+  /**
+   * Find Ampelos agent by Letta agent ID
+   * Searches through all enabled agents to find which one owns the given Letta agent
+   */
+  private async findAgentByLettaId(lettaAgentId: string): Promise<AgentId | null> {
+    const enabledAgents = this.agentRegistry.getEnabledAgents();
+
+    for (const agent of enabledAgents) {
+      // Check if agent has letta module enabled
+      if (!agent.modules.includes('letta')) {
+        continue;
+      }
+
+      // Try to get the letta service for this agent
+      try {
+        const lettaService = this.serviceManager.getService(agent.agent_id, 'letta');
+        if (!lettaService) {
+          continue;
+        }
+
+        // Get the Letta agent ID from the service
+        const serviceLettaId = (lettaService as any).getLettaAgentId?.();
+        if (serviceLettaId === lettaAgentId) {
+          return agent.agent_id;
+        }
+      } catch (error) {
+        // Service not initialized yet, skip
+        continue;
+      }
+    }
+
+    return null;
   }
 
   /**
