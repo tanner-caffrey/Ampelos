@@ -154,117 +154,10 @@ const letta_update_memory: ToolDefinition = {
 };
 
 /**
- * Search archival memory
- */
-const letta_search_archival: ToolDefinition = {
-  name: 'letta_search_archival',
-  description: 'Search the agent\'s long-term archival memory for relevant information',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      query: {
-        type: 'string',
-        description: 'Search query for archival memory'
-      },
-      page: {
-        type: 'number',
-        description: 'Page number for paginated results (default: 0)'
-      }
-    },
-    required: ['query']
-  },
-  handler: async (params, context): Promise<ToolResult> => {
-    try {
-      const service = context.getService<LettaService>('letta');
-      const query = params.query as string;
-      const page = (params.page as number) || 0;
-
-      const results = await service.searchArchival(query, page);
-
-      if (results.length === 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: 'No results found in archival memory'
-            }
-          ]
-        };
-      }
-
-      const formattedResults = results
-        .map((result, idx) => `[${idx + 1}] ${JSON.stringify(result, null, 2)}`)
-        .join('\n\n');
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Found ${results.length} results:\n\n${formattedResults}`
-          }
-        ]
-      };
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : String(error)}`
-          }
-        ],
-        isError: true
-      };
-    }
-  }
-};
-
-/**
- * Insert into archival memory
- */
-const letta_insert_archival: ToolDefinition = {
-  name: 'letta_insert_archival',
-  description: 'Insert new information into the agent\'s long-term archival memory',
-  inputSchema: {
-    type: 'object',
-    properties: {
-      content: {
-        type: 'string',
-        description: 'Content to store in archival memory. Include relevant tags in the format: #tag1 #tag2'
-      }
-    },
-    required: ['content']
-  },
-  handler: async (params, context): Promise<ToolResult> => {
-    try {
-      const service = context.getService<LettaService>('letta');
-      const content = params.content as string;
-
-      await service.insertArchival(content);
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: 'Successfully inserted content into archival memory'
-          }
-        ]
-      };
-    } catch (error) {
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Error: ${error instanceof Error ? error.message : String(error)}`
-          }
-        ],
-        isError: true
-      };
-    }
-  }
-};
-
-/**
  * Get conversation history
+ *
+ * Note: Agents can search their own conversation using the built-in
+ * conversation_search tool. This tool is for external access to history.
  */
 const letta_get_messages: ToolDefinition = {
   name: 'letta_get_messages',
@@ -352,9 +245,8 @@ const letta_get_agent_info: ToolDefinition = {
 Agent ID: ${info.id}
 Name: ${info.name}
 Model: ${info.model}
-Embedding: ${info.embedding_model}
+Embedding: ${info.embedding}
 Created: ${info.created_at}
-Last Updated: ${info.last_updated}
 `.trim();
 
       return {

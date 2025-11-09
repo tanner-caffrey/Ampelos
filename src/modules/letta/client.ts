@@ -35,7 +35,7 @@ export interface AgentInfo {
 }
 
 export interface ChatResponse {
-  messages: Letta.LettaResponse[];
+  messages: Letta.LettaMessageUnion[];
   usage?: {
     step_count: number;
     total_tokens?: number;
@@ -128,16 +128,8 @@ export class LettaClientWrapper {
    */
   async updateMemoryBlock(agentId: string, blockLabel: string, value: string): Promise<void> {
     try {
-      // Retrieve all blocks to find the one we want
-      const blocks = await this.client.agents.blocks.list(agentId);
-      const block = blocks.find((b: any) => b.label === blockLabel);
-
-      if (!block) {
-        throw new Error(`Memory block "${blockLabel}" not found`);
-      }
-
-      // Update it
-      await this.client.agents.blocks.update(agentId, block.id, {
+      // Use modify() with blockLabel directly
+      await this.client.agents.blocks.modify(agentId, blockLabel, {
         value
       });
     } catch (error: any) {
@@ -154,7 +146,9 @@ export class LettaClientWrapper {
       const memory: Record<string, string> = {};
 
       for (const block of blocks) {
-        memory[block.label] = block.value;
+        if (block.label) {
+          memory[block.label] = block.value;
+        }
       }
 
       return memory;
@@ -168,16 +162,16 @@ export class LettaClientWrapper {
    */
   async sendMessage(agentId: string, message: string): Promise<ChatResponse> {
     try {
-      const request: Letta.SendMessageRequest = {
+      const request: Letta.LettaRequest = {
         messages: [
           {
             role: 'user',
-            text: message
+            content: message
           }
         ]
       };
 
-      const response = await this.client.agents.messages.sendMessage(agentId, request);
+      const response = await this.client.agents.messages.create(agentId, request);
 
       return {
         messages: response.messages || [],
@@ -199,7 +193,7 @@ export class LettaClientWrapper {
    * Note: Agents can search their own conversation history using
    * the built-in conversation_search tool
    */
-  async getMessages(agentId: string, limit: number = 50): Promise<Letta.LettaResponse[]> {
+  async getMessages(agentId: string, limit: number = 50): Promise<Letta.LettaMessageUnion[]> {
     try {
       const response = await this.client.agents.messages.list(agentId, {
         limit
@@ -255,12 +249,15 @@ export class LettaClientWrapper {
   /**
    * Create a custom tool from Python source code
    */
-  async createTool(sourceCode: string, name?: string): Promise<string> {
+  async createTool(sourceCode: string, description?: string): Promise<string> {
     try {
       const tool = await this.client.tools.upsert({
         sourceCode,
-        name
+        description
       });
+      if (!tool.id) {
+        throw new Error('Tool created but no ID returned');
+      }
       return tool.id;
     } catch (error: any) {
       throw new Error(`Failed to create tool: ${error.message}`);
