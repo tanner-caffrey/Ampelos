@@ -4,7 +4,7 @@
  * Using sacred computer design system
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { LettaTool } from '../hooks/useAgentTools';
 import Card from '../../sacred/components/Card';
 import Button from '../../sacred/components/Button';
@@ -32,6 +32,19 @@ export default function ToolManager({
   const [attaching, setAttaching] = useState(false);
   const [detaching, setDetaching] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const [toolFilter, setToolFilter] = useState<string>('');
+
+  // Filter unattached tools based on search input
+  const filteredUnattachedTools = useMemo(() => {
+    if (!toolFilter.trim()) return unattachedTools;
+    const search = toolFilter.toLowerCase();
+    return unattachedTools.filter(
+      (tool) =>
+        tool.name.toLowerCase().includes(search) ||
+        (tool.description && tool.description.toLowerCase().includes(search))
+    );
+  }, [unattachedTools, toolFilter]);
 
   const handleAttach = async () => {
     if (!selectedToolId) return;
@@ -41,11 +54,16 @@ export default function ToolManager({
     try {
       await onAttachTool(selectedToolId);
       setSelectedToolId('');
+      setToolFilter('');
     } catch (err) {
       setActionError(err instanceof Error ? err.message : 'Failed to attach tool');
     } finally {
       setAttaching(false);
     }
+  };
+
+  const toggleToolExpand = (toolId: string) => {
+    setExpandedTool(expandedTool === toolId ? null : toolId);
   };
 
   const handleDetach = async (toolId: string) => {
@@ -83,25 +101,40 @@ export default function ToolManager({
       {/* Add Tool Form */}
       <Card title="Attach Tool">
         <div className={styles.addToolForm}>
-          <select
-            className={styles.select}
-            value={selectedToolId}
-            onChange={(e) => setSelectedToolId(e.target.value)}
+          <input
+            type="text"
+            className={styles.filterInput}
+            placeholder="Filter tools..."
+            value={toolFilter}
+            onChange={(e) => setToolFilter(e.target.value)}
             disabled={attaching}
-          >
-            <option value="">Select a tool to attach...</option>
-            {unattachedTools.map((tool) => (
-              <option key={tool.id} value={tool.id}>
-                {tool.name}
-              </option>
-            ))}
-          </select>
-          <Button
-            onClick={handleAttach}
-            isDisabled={!selectedToolId || attaching}
-          >
-            {attaching ? 'Attaching...' : 'Attach'}
-          </Button>
+          />
+          <div className={styles.selectRow}>
+            <select
+              className={styles.select}
+              value={selectedToolId}
+              onChange={(e) => setSelectedToolId(e.target.value)}
+              disabled={attaching}
+            >
+              <option value="">Select a tool to attach...</option>
+              {filteredUnattachedTools.map((tool) => (
+                <option key={tool.id} value={tool.id}>
+                  {tool.name}
+                </option>
+              ))}
+            </select>
+            <Button
+              onClick={handleAttach}
+              isDisabled={!selectedToolId || attaching}
+            >
+              {attaching ? 'Attaching...' : 'Attach'}
+            </Button>
+          </div>
+          {toolFilter && (
+            <span className={styles.filterHint}>
+              Showing {filteredUnattachedTools.length} of {unattachedTools.length} tools
+            </span>
+          )}
         </div>
       </Card>
 
@@ -111,26 +144,37 @@ export default function ToolManager({
           <div className={styles.empty}>No tools attached to this agent</div>
         ) : (
           <div className={styles.toolList}>
-            {attachedTools.map((tool) => (
-              <div key={tool.id} className={styles.toolCard}>
-                <div className={styles.toolHeader}>
-                  <span className={styles.toolName}>{tool.name}</span>
-                  <Badge>{tool.id.slice(0, 8)}...</Badge>
-                </div>
-                {tool.description && (
-                  <p className={styles.toolDescription}>{tool.description}</p>
-                )}
-                <div className={styles.toolActions}>
-                  <Button
-                    theme="SECONDARY"
-                    onClick={() => handleDetach(tool.id)}
-                    isDisabled={detaching === tool.id}
+            {attachedTools.map((tool) => {
+              const isExpanded = expandedTool === tool.id;
+              return (
+                <div key={tool.id} className={styles.toolItem}>
+                  <div
+                    className={styles.toolHeader}
+                    onClick={() => toggleToolExpand(tool.id)}
                   >
-                    {detaching === tool.id ? 'Detaching...' : 'Detach'}
-                  </Button>
+                    <span className={styles.expandIcon}>{isExpanded ? '▼' : '▶'}</span>
+                    <span className={styles.toolName}>{tool.name}</span>
+                    <Badge>{tool.id.slice(0, 8)}...</Badge>
+                  </div>
+                  {isExpanded && (
+                    <div className={styles.toolDetails}>
+                      {tool.description && (
+                        <p className={styles.toolDescription}>{tool.description}</p>
+                      )}
+                      <div className={styles.toolActions}>
+                        <Button
+                          theme="SECONDARY"
+                          onClick={() => handleDetach(tool.id)}
+                          isDisabled={detaching === tool.id}
+                        >
+                          {detaching === tool.id ? 'Detaching...' : 'Detach'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>

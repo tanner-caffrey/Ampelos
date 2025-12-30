@@ -32,18 +32,6 @@ const AgentCard: React.FC<AgentCardProps> = ({ agent, onToggleEnabled, onDelete 
 
       <div className={styles.body}>
         <div className={styles.info}>
-          <span className={styles.label}>Modules:</span>
-          <span className={styles.value}>
-            {agent.modules?.length ? agent.modules.join(', ') : 'None'}
-          </span>
-        </div>
-        <div className={styles.info}>
-          <span className={styles.label}>Count:</span>
-          <span className={styles.value}>
-            {agent.modules?.length ?? 0} module{(agent.modules?.length ?? 0) !== 1 ? 's' : ''}
-          </span>
-        </div>
-        <div className={styles.info}>
           <span className={styles.label}>Created:</span>
           <span className={styles.value}>{formatDate(agent.created_at)}</span>
         </div>

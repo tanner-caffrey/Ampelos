@@ -1,28 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { useAvailableModules } from '../hooks/useModules';
 import { useAgentTemplates } from '../hooks/useTemplates';
-import LettaConfigForm, { getDefaultLettaConfig, LettaConfig } from '../components/module-configs/LettaConfigForm';
-import SpatialConfigForm, { getDefaultSpatialConfig, SpatialConfig } from '../components/module-configs/SpatialConfigForm';
-import BodyInventoryConfigForm, { getDefaultBodyInventoryConfig, BodyInventoryConfig } from '../components/module-configs/BodyInventoryConfigForm';
-import type { ModuleInitConfig } from '../types/admin';
 import * as api from '../api/adminClient';
 import styles from './AgentCreatePage.module.scss';
 
 type CreateMode = 'manual' | 'template';
 
-// Modules that have configuration forms
-const CONFIGURABLE_MODULES = ['letta', 'spatial', 'body_and_inventory'];
-
-interface ModuleConfigs {
-  letta?: LettaConfig;
-  spatial?: SpatialConfig;
-  body_and_inventory?: BodyInventoryConfig;
-}
-
 const AgentCreatePage: React.FC = () => {
   const navigate = useNavigate();
-  const { modules: availableModules } = useAvailableModules();
   const { templates } = useAgentTemplates();
 
   const [mode, setMode] = useState<CreateMode>('manual');
@@ -33,9 +18,6 @@ const AgentCreatePage: React.FC = () => {
   const [agentId, setAgentId] = useState('');
   const [agentName, setAgentName] = useState('');
   const [enabled, setEnabled] = useState(true);
-  const [selectedModules, setSelectedModules] = useState<string[]>([]);
-  const [moduleConfigs, setModuleConfigs] = useState<ModuleConfigs>({});
-  const [expandedModule, setExpandedModule] = useState<string | null>(null);
 
   // Template mode state
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -49,44 +31,14 @@ const AgentCreatePage: React.FC = () => {
       return;
     }
 
-    // Validate letta config if selected
-    if (selectedModules.includes('letta') && moduleConfigs.letta) {
-      const lettaConfig = moduleConfigs.letta.letta_agent_config;
-      if (!lettaConfig.model || !lettaConfig.embedding) {
-        setError('Letta module requires model and embedding selection');
-        return;
-      }
-      if (Object.keys(lettaConfig.memory_blocks).length === 0) {
-        setError('Letta module requires at least one memory block');
-        return;
-      }
-    }
-
     setCreating(true);
     setError(null);
 
     try {
-      // Build module configs for the request
-      const module_configs: Record<string, ModuleInitConfig> = {};
-
-      for (const mod of selectedModules) {
-        // Get the configuration for configurable modules
-        if (mod === 'letta' && moduleConfigs.letta) {
-          module_configs[mod] = moduleConfigs.letta as ModuleInitConfig;
-        } else if (mod === 'spatial' && moduleConfigs.spatial) {
-          module_configs[mod] = moduleConfigs.spatial as ModuleInitConfig;
-        } else if (mod === 'body_and_inventory' && moduleConfigs.body_and_inventory) {
-          module_configs[mod] = moduleConfigs.body_and_inventory as ModuleInitConfig;
-        }
-        // Non-configurable modules don't need configs
-      }
-
       await api.createAgent({
         id: agentId,
         name: agentName,
         enabled,
-        modules: selectedModules,
-        module_configs,
       });
 
       navigate(`/admin/agents/${agentId}`);
@@ -121,81 +73,10 @@ const AgentCreatePage: React.FC = () => {
     }
   };
 
-  const handleModuleToggle = (moduleName: string) => {
-    const isSelected = selectedModules.includes(moduleName);
-
-    if (isSelected) {
-      // Remove module
-      setSelectedModules((prev) => prev.filter((m) => m !== moduleName));
-      setModuleConfigs((prev) => {
-        const newConfigs = { ...prev };
-        delete newConfigs[moduleName as keyof ModuleConfigs];
-        return newConfigs;
-      });
-      if (expandedModule === moduleName) {
-        setExpandedModule(null);
-      }
-    } else {
-      // Add module with default config
-      setSelectedModules((prev) => [...prev, moduleName]);
-
-      // Initialize default config for configurable modules
-      if (moduleName === 'letta') {
-        setModuleConfigs((prev) => ({ ...prev, letta: getDefaultLettaConfig() }));
-        setExpandedModule('letta');
-      } else if (moduleName === 'spatial') {
-        setModuleConfigs((prev) => ({ ...prev, spatial: getDefaultSpatialConfig() }));
-        setExpandedModule('spatial');
-      } else if (moduleName === 'body_and_inventory') {
-        setModuleConfigs((prev) => ({ ...prev, body_and_inventory: getDefaultBodyInventoryConfig() }));
-        setExpandedModule('body_and_inventory');
-      }
-    }
-  };
-
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId);
     setTemplateVariables({ agent_id: '', agent_name: '' });
   };
-
-  const isConfigurable = (moduleName: string) => CONFIGURABLE_MODULES.includes(moduleName);
-
-  const renderModuleConfig = (moduleName: string) => {
-    switch (moduleName) {
-      case 'letta':
-        return moduleConfigs.letta ? (
-          <LettaConfigForm
-            config={moduleConfigs.letta}
-            onChange={(config) => setModuleConfigs((prev) => ({ ...prev, letta: config }))}
-          />
-        ) : null;
-      case 'spatial':
-        return moduleConfigs.spatial ? (
-          <SpatialConfigForm
-            config={moduleConfigs.spatial}
-            onChange={(config) => setModuleConfigs((prev) => ({ ...prev, spatial: config }))}
-          />
-        ) : null;
-      case 'body_and_inventory':
-        return moduleConfigs.body_and_inventory ? (
-          <BodyInventoryConfigForm
-            config={moduleConfigs.body_and_inventory}
-            onChange={(config) => setModuleConfigs((prev) => ({ ...prev, body_and_inventory: config }))}
-          />
-        ) : null;
-      default:
-        return null;
-    }
-  };
-
-  // Sort modules: configurable first, then alphabetically
-  const sortedModules = [...availableModules].sort((a, b) => {
-    const aConfigurable = isConfigurable(a.name);
-    const bConfigurable = isConfigurable(b.name);
-    if (aConfigurable && !bConfigurable) return -1;
-    if (!aConfigurable && bConfigurable) return 1;
-    return a.name.localeCompare(b.name);
-  });
 
   return (
     <div className={styles.page}>
@@ -256,61 +137,6 @@ const AgentCreatePage: React.FC = () => {
               />
               Enabled
             </label>
-          </div>
-
-          <div className={styles.field}>
-            <label className={styles.label}>Modules</label>
-            <p className={styles.hint}>
-              Select modules to enable. Configurable modules (letta, spatial, body_and_inventory) will show configuration options when selected.
-            </p>
-
-            <div className={styles.moduleList}>
-              {sortedModules.map((mod) => {
-                const isSelected = selectedModules.includes(mod.name);
-                const hasConfig = isConfigurable(mod.name);
-                const isExpanded = expandedModule === mod.name;
-
-                return (
-                  <div key={mod.name} className={styles.moduleItem}>
-                    <div
-                      className={`${styles.moduleHeader} ${isSelected ? styles.selected : ''}`}
-                      onClick={() => handleModuleToggle(mod.name)}
-                    >
-                      <div className={styles.moduleCheckbox}>
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
-                      <div className={styles.moduleInfo}>
-                        <span className={styles.moduleName}>{mod.name}</span>
-                        <span className={styles.moduleVersion}>v{mod.version}</span>
-                        {hasConfig && <span className={styles.configurableBadge}>configurable</span>}
-                      </div>
-                      {isSelected && hasConfig && (
-                        <button
-                          className={styles.expandButton}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setExpandedModule(isExpanded ? null : mod.name);
-                          }}
-                        >
-                          {isExpanded ? '▼ Hide Config' : '▶ Configure'}
-                        </button>
-                      )}
-                    </div>
-
-                    {isSelected && hasConfig && isExpanded && (
-                      <div className={styles.moduleConfigWrapper}>
-                        {renderModuleConfig(mod.name)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
           <button

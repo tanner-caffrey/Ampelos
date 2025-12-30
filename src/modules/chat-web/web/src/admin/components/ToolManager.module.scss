@@ -20,8 +20,43 @@
 
 .addToolForm {
   display: flex;
+  flex-direction: column;
+  gap: calc(var(--theme-line-height-base, 1rem) * 0.5);
+}
+
+.filterInput {
+  width: 100%;
+  padding: calc(var(--theme-line-height-base, 1rem) * 0.25) 1ch;
+  border: 2px solid var(--theme-text, #333);
+  background: var(--theme-background, #fff);
+  color: var(--theme-text, #333);
+  font-family: inherit;
+  font-size: var(--font-size, 1rem);
+
+  &::placeholder {
+    color: var(--theme-text-muted, #888);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: inset 0 0 0 2px var(--theme-text, #333);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.selectRow {
+  display: flex;
   gap: 1ch;
   align-items: center;
+}
+
+.filterHint {
+  font-size: var(--font-size-small, 0.85rem);
+  color: var(--theme-text-muted, #888);
 }
 
 .select {
@@ -60,11 +95,37 @@
   }
 }
 
+.toolItem {
+  border-bottom: 1px solid var(--theme-border, #333);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
 .toolHeader {
   display: flex;
   align-items: center;
   gap: 1ch;
-  margin-bottom: calc(var(--theme-line-height-base, 1rem) * 0.25);
+  padding: calc(var(--theme-line-height-base, 1rem) * 0.25) 0;
+  cursor: pointer;
+  user-select: none;
+
+  &:hover {
+    background: rgba(var(--theme-text-rgb, 51, 51, 51), 0.05);
+  }
+}
+
+.expandIcon {
+  font-size: 0.75em;
+  color: var(--theme-text-muted, #888);
+  width: 1.5ch;
+}
+
+.toolDetails {
+  padding: calc(var(--theme-line-height-base, 1rem) * 0.5);
+  padding-left: 2.5ch;
+  border-top: 1px dashed var(--theme-border, #555);
 }
 
 .toolName {

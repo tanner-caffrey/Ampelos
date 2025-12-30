@@ -4,7 +4,7 @@
  * Using sacred computer design system
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import type { LLMConfig } from '../hooks/useLLMConfig';
 import Card from '../../sacred/components/Card';
 import Button from '../../sacred/components/Button';
@@ -43,6 +43,14 @@ export default function LLMConfigSection({
       setEditedContextWindow(config.context_window || 0);
     }
   }, [config]);
+
+  // Ensure the current model is always in the list of available models
+  const modelOptions = useMemo(() => {
+    if (!config) return availableModels;
+    if (availableModels.includes(config.model)) return availableModels;
+    // Current model not in list - add it at the beginning
+    return [config.model, ...availableModels];
+  }, [availableModels, config]);
 
   const handleSave = async (field: string, value: unknown) => {
     setSaving(field);
@@ -94,15 +102,11 @@ export default function LLMConfigSection({
               onChange={(e) => handleSave('model', e.target.value)}
               disabled={saving === 'model'}
             >
-              {availableModels.length > 0 ? (
-                availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))
-              ) : (
-                <option value={config.model}>{config.model}</option>
-              )}
+              {modelOptions.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
             </select>
             {saving === 'model' && <Badge>Saving...</Badge>}
           </div>

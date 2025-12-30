@@ -223,6 +223,46 @@ export class MCPServer {
   }
 
   /**
+   * SPA fallback: serve index.html for client-side routing
+   * Called when no static file matches the request path
+   */
+  private async serveSpaFallback(req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+    try {
+      const chatWebModule = this.modules.get('chat-web');
+      if (!chatWebModule || !chatWebModule.loaded) {
+        return false;
+      }
+
+      const distPath = resolve(join(chatWebModule.path, 'web', 'dist'));
+      const indexPath = join(distPath, 'index.html');
+
+      // Check if index.html exists
+      try {
+        const stats = await stat(indexPath);
+        if (!stats.isFile()) {
+          return false;
+        }
+      } catch {
+        return false;
+      }
+
+      const content = await readFile(indexPath);
+
+      chatWebLog.debug(`SPA fallback: serving index.html for ${req.url}`);
+      res.writeHead(200, {
+        'Content-Type': 'text/html',
+        'Cache-Control': 'no-cache'
+      });
+      res.end(content);
+      return true;
+    } catch (error) {
+      const err = error as Error;
+      chatWebLog.error('Error serving SPA fallback', { error: err.message });
+      return false;
+    }
+  }
+
+  /**
    * Set the LettaManager instance
    */
   setLettaManager(lettaManager: LettaManager): void {
@@ -774,6 +814,12 @@ export class MCPServer {
       if (req.method === 'GET' && !req.url?.startsWith('/api/') && !req.url?.startsWith('/mcp')) {
         const served = await this.serveStaticFile(req, res);
         if (served) {
+          return;
+        }
+
+        // SPA fallback: serve index.html for unmatched routes (client-side routing)
+        const indexServed = await this.serveSpaFallback(req, res);
+        if (indexServed) {
           return;
         }
       }

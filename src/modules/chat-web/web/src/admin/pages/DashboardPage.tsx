@@ -84,9 +84,6 @@ const DashboardPage: React.FC = () => {
                   {agent.enabled ? '●' : '○'}
                 </span>
                 <span className={styles.agentId}>{agent.id}</span>
-                <span className={styles.agentModules}>
-                  {agent.modules ? Object.keys(agent.modules).join(', ') : 'No modules'}
-                </span>
               </Link>
             ))
           )}
