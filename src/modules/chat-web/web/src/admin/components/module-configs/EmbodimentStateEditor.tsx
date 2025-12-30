@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../../../utils/apiFetch';
 import styles from './ModuleConfigForm.module.scss';
 
 interface BodyPart {
@@ -61,7 +62,7 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
   const fetchState = async () => {
     try {
       setLoading(true);
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/agents/${encodeURIComponent(agentId)}/modules/body_and_inventory/state`
       );
       if (!response.ok) {
@@ -87,7 +88,7 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
     setActionError(null);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/agents/${encodeURIComponent(agentId)}/modules/body_and_inventory/state`,
         {
           method: 'PUT',

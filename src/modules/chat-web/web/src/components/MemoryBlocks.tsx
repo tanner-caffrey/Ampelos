@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Agent } from '../App';
+import { apiFetch } from '../utils/apiFetch';
 import './MemoryBlocks.css';
 
 interface MemoryBlock {
@@ -32,7 +33,7 @@ function MemoryBlocks({ agent }: MemoryBlocksProps) {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/agents/${encodeURIComponent(agent.agent_id)}/memory`);
+      const response = await apiFetch(`/api/agents/${encodeURIComponent(agent.agent_id)}/memory`);
       if (!response.ok) {
         throw new Error(`Failed to load memory: ${response.statusText}`);
       }

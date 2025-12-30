@@ -3,6 +3,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { apiFetch } from '../../utils/apiFetch';
 
 /**
  * Tool info from Letta
@@ -31,7 +32,7 @@ export function useAgentTools(agentId: string | undefined) {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/letta-tools`);
+      const response = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/letta-tools`);
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to load tools');
@@ -55,7 +56,7 @@ export function useAgentTools(agentId: string | undefined) {
   const attachTool = async (toolId: string): Promise<void> => {
     if (!agentId) throw new Error('No agent ID');
 
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/agents/${encodeURIComponent(agentId)}/letta-tools/${encodeURIComponent(toolId)}`,
       { method: 'POST' }
     );
@@ -72,7 +73,7 @@ export function useAgentTools(agentId: string | undefined) {
   const detachTool = async (toolId: string): Promise<void> => {
     if (!agentId) throw new Error('No agent ID');
 
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/agents/${encodeURIComponent(agentId)}/letta-tools/${encodeURIComponent(toolId)}`,
       { method: 'DELETE' }
     );

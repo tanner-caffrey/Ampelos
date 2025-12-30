@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { apiFetch } from '../../utils/apiFetch';
 import { useAgent } from '../hooks/useAgents';
 import { useAvailableModules } from '../hooks/useModules';
 import { useMemoryBlocks } from '../hooks/useMemoryBlocks';
@@ -140,7 +141,7 @@ const AgentDetailPage: React.FC = () => {
 
   const handleModelChange = async (model: string) => {
     if (!agentId) return;
-    const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/model`, {
+    const response = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/model`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ model }),
@@ -156,7 +157,7 @@ const AgentDetailPage: React.FC = () => {
   const handleBlueskyConfigSave = async (config: BlueskyConfig) => {
     if (!agentId) return;
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/agents/${encodeURIComponent(agentId)}/modules/bluesky/config`,
         {
           method: 'PUT',
@@ -183,7 +184,7 @@ const AgentDetailPage: React.FC = () => {
     if (!agentId) return;
     setLoadingBlueskyConfig(true);
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/agents/${encodeURIComponent(agentId)}/modules/bluesky/config`
       );
       if (response.ok) {

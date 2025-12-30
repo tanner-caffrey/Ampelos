@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../../../utils/apiFetch';
 import styles from './ModuleConfigForm.module.scss';
 
 interface World {
@@ -42,7 +43,7 @@ const SpatialStateEditor: React.FC<SpatialStateEditorProps> = ({ agentId, onClos
     const fetchState = async () => {
       try {
         setLoading(true);
-        const response = await fetch(
+        const response = await apiFetch(
           `/api/admin/agents/${encodeURIComponent(agentId)}/modules/spatial/state`
         );
         if (!response.ok) {
@@ -78,7 +79,7 @@ const SpatialStateEditor: React.FC<SpatialStateEditorProps> = ({ agentId, onClos
     setActionError(null);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/agents/${encodeURIComponent(agentId)}/modules/spatial/state`,
         {
           method: 'PUT',
@@ -112,7 +113,7 @@ const SpatialStateEditor: React.FC<SpatialStateEditorProps> = ({ agentId, onClos
     setActionError(null);
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/admin/agents/${encodeURIComponent(agentId)}/modules/spatial/state`,
         {
           method: 'PUT',

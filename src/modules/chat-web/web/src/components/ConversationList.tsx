@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Agent } from '../types';
+import { apiFetch } from '../utils/apiFetch';
 import Button from '../sacred/components/Button';
 import Card from '../sacred/components/Card';
 import Input from '../sacred/components/Input';
@@ -57,7 +58,7 @@ function ConversationList({ agents, selectedConversationId, onSelectConversation
   const loadConversations = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/conversations');
+      const response = await apiFetch('/api/conversations');
       if (!response.ok) {
         throw new Error('Failed to load conversations');
       }
@@ -87,7 +88,7 @@ function ConversationList({ agents, selectedConversationId, onSelectConversation
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch('/api/conversations', {
+      const response = await apiFetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

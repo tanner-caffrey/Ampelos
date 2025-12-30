@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../../../utils/apiFetch';
 import { useMemoryBlocks } from '../../hooks/useMemoryBlocks';
 import MemoryBlockEditor from '../MemoryBlockEditor';
 import styles from './LettaEditForm.module.scss';
@@ -32,7 +33,7 @@ const LettaEditForm: React.FC<LettaEditFormProps> = ({
   useEffect(() => {
     const loadModels = async () => {
       try {
-        const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/models`);
+        const response = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/models`);
         if (response.ok) {
           const data = await response.json();
           setAvailableModels(data.models || []);

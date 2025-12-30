@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { apiFetch } from '../utils/apiFetch';
 import './ScheduleModal.css';
 
 interface Schedule {
@@ -44,7 +45,7 @@ function ScheduleModal({ agentId, agentName, isOpen, onClose }: ScheduleModalPro
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/schedules`);
+      const response = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/schedules`);
       if (!response.ok) {
         throw new Error(`Failed to load schedules: ${response.statusText}`);
       }
@@ -66,7 +67,7 @@ function ScheduleModal({ agentId, agentName, isOpen, onClose }: ScheduleModalPro
       setCreating(true);
       setError(null);
 
-      const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/schedules`, {
+      const response = await apiFetch(`/api/agents/${encodeURIComponent(agentId)}/schedules`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -98,7 +99,7 @@ function ScheduleModal({ agentId, agentName, isOpen, onClose }: ScheduleModalPro
   const handleDelete = async (scheduleId: string) => {
     try {
       setError(null);
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/agents/${encodeURIComponent(agentId)}/schedules/${encodeURIComponent(scheduleId)}`,
         { method: 'DELETE' }
       );

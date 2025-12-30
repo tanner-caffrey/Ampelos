@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Agent, Message as AppMessage } from '../App';
 import { Conversation, ConversationMessage } from './ConversationList';
+import { apiFetch } from '../utils/apiFetch';
 import Button from '../sacred/components/Button';
 import Card from '../sacred/components/Card';
 import Input from '../sacred/components/Input';
@@ -36,7 +37,7 @@ function MultiAgentChat({ conversation, agents, onConversationUpdate, onBack }: 
 
   const loadMessages = async () => {
     try {
-      const response = await fetch(`/api/conversations/${conversation.id}/messages`);
+      const response = await apiFetch(`/api/conversations/${conversation.id}/messages`);
       if (!response.ok) {
         throw new Error('Failed to load messages');
       }
@@ -44,7 +45,7 @@ function MultiAgentChat({ conversation, agents, onConversationUpdate, onBack }: 
       setMessages(data.messages || []);
       
       // Update conversation
-      const convResponse = await fetch(`/api/conversations/${conversation.id}`);
+      const convResponse = await apiFetch(`/api/conversations/${conversation.id}`);
       if (convResponse.ok) {
         const convData = await convResponse.json();
         onConversationUpdate(convData.conversation);
@@ -77,7 +78,7 @@ function MultiAgentChat({ conversation, agents, onConversationUpdate, onBack }: 
     setMessages(prev => [...prev, tempUserMsg]);
 
     try {
-      const response = await fetch(`/api/conversations/${conversation.id}/messages`, {
+      const response = await apiFetch(`/api/conversations/${conversation.id}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: userMessage })
@@ -111,7 +112,7 @@ function MultiAgentChat({ conversation, agents, onConversationUpdate, onBack }: 
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/conversations/${conversation.id}/approve`, {
+      const response = await apiFetch(`/api/conversations/${conversation.id}/approve`, {
         method: 'POST'
       });
 

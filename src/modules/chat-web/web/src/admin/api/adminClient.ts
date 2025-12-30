@@ -7,6 +7,7 @@
  * - Module state is stored separately
  */
 
+import { apiFetch } from '../../utils/apiFetch';
 import type {
   AgentDefinition,
   CreateAgentRequest,
@@ -45,17 +46,17 @@ async function handleResponse<T>(response: Response): Promise<T> {
 // =============================================================================
 
 export async function fetchAgents(): Promise<{ agents: AgentDefinition[] }> {
-  const response = await fetch(`${API_BASE}/agents`);
+  const response = await apiFetch(`${API_BASE}/agents`);
   return handleResponse(response);
 }
 
 export async function fetchAgent(agentId: string): Promise<{ agent: AgentDefinition; state?: Record<string, unknown> }> {
-  const response = await fetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}`);
+  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}`);
   return handleResponse(response);
 }
 
 export async function createAgent(data: CreateAgentRequest): Promise<{ agent: AgentDefinition }> {
-  const response = await fetch(`${API_BASE}/agents`, {
+  const response = await apiFetch(`${API_BASE}/agents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -71,7 +72,7 @@ export async function createAgentFromTemplate(
     template: templateId,
     variables: variables as CreateAgentFromTemplateRequest['variables'],
   };
-  const response = await fetch(`${API_BASE}/agents`, {
+  const response = await apiFetch(`${API_BASE}/agents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(request),
@@ -83,7 +84,7 @@ export async function updateAgent(
   agentId: string,
   data: UpdateAgentRequest
 ): Promise<{ agent: AgentDefinition }> {
-  const response = await fetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}`, {
+  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -95,19 +96,19 @@ export async function deleteAgent(agentId: string, deleteLetta = false): Promise
   const url = deleteLetta
     ? `${API_BASE}/agents/${encodeURIComponent(agentId)}?deleteLetta=true`
     : `${API_BASE}/agents/${encodeURIComponent(agentId)}`;
-  const response = await fetch(url, { method: 'DELETE' });
+  const response = await apiFetch(url, { method: 'DELETE' });
   await handleResponse(response);
 }
 
 export async function enableAgent(agentId: string): Promise<{ agent: AgentDefinition }> {
-  const response = await fetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/enable`, {
+  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/enable`, {
     method: 'POST',
   });
   return handleResponse(response);
 }
 
 export async function disableAgent(agentId: string): Promise<{ agent: AgentDefinition }> {
-  const response = await fetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/disable`, {
+  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/disable`, {
     method: 'POST',
   });
   return handleResponse(response);
@@ -118,21 +119,21 @@ export async function disableAgent(agentId: string): Promise<{ agent: AgentDefin
 // =============================================================================
 
 export async function fetchAvailableModules(): Promise<{ modules: AvailableModule[] }> {
-  const response = await fetch(`${API_BASE}/modules`);
+  const response = await apiFetch(`${API_BASE}/modules`);
   return handleResponse(response);
 }
 
 export async function fetchModuleSchema(
   moduleName: string
 ): Promise<{ name: string; version: string; schema: Record<string, unknown> }> {
-  const response = await fetch(`${API_BASE}/modules/${encodeURIComponent(moduleName)}/schema`);
+  const response = await apiFetch(`${API_BASE}/modules/${encodeURIComponent(moduleName)}/schema`);
   return handleResponse(response);
 }
 
 export async function fetchAgentModules(
   agentId: string
 ): Promise<{ modules: string[] }> {
-  const response = await fetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/modules`);
+  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/modules`);
   return handleResponse(response);
 }
 
@@ -141,7 +142,7 @@ export async function addModuleToAgent(
   moduleName: string,
   config?: AddModuleRequest
 ): Promise<{ modules: string[] }> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules/${encodeURIComponent(moduleName)}`,
     {
       method: 'POST',
@@ -153,7 +154,7 @@ export async function addModuleToAgent(
 }
 
 export async function removeModuleFromAgent(agentId: string, moduleName: string): Promise<void> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules/${encodeURIComponent(moduleName)}`,
     { method: 'DELETE' }
   );
@@ -165,29 +166,29 @@ export async function removeModuleFromAgent(agentId: string, moduleName: string)
 // =============================================================================
 
 export async function fetchMemoryBlockTemplates(): Promise<{ templates: TemplateInfo[] }> {
-  const response = await fetch(`${API_BASE}/templates/memory-blocks`);
+  const response = await apiFetch(`${API_BASE}/templates/memory-blocks`);
   return handleResponse(response);
 }
 
 export async function fetchSystemPromptTemplates(): Promise<{ templates: TemplateInfo[] }> {
-  const response = await fetch(`${API_BASE}/templates/system-prompts`);
+  const response = await apiFetch(`${API_BASE}/templates/system-prompts`);
   return handleResponse(response);
 }
 
 export async function fetchAgentTemplates(): Promise<{ templates: AgentTemplate[] }> {
-  const response = await fetch(`${API_BASE}/templates/agents`);
+  const response = await apiFetch(`${API_BASE}/templates/agents`);
   return handleResponse(response);
 }
 
 export async function fetchAgentTemplate(templateId: string): Promise<{ template: AgentTemplate }> {
-  const response = await fetch(`${API_BASE}/templates/agents/${encodeURIComponent(templateId)}`);
+  const response = await apiFetch(`${API_BASE}/templates/agents/${encodeURIComponent(templateId)}`);
   return handleResponse(response);
 }
 
 export async function createAgentTemplate(
   data: CreateAgentTemplateRequest
 ): Promise<{ template: AgentTemplate }> {
-  const response = await fetch(`${API_BASE}/templates/agents`, {
+  const response = await apiFetch(`${API_BASE}/templates/agents`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -196,14 +197,14 @@ export async function createAgentTemplate(
 }
 
 export async function deleteAgentTemplate(templateId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/templates/agents/${encodeURIComponent(templateId)}`, {
+  const response = await apiFetch(`${API_BASE}/templates/agents/${encodeURIComponent(templateId)}`, {
     method: 'DELETE',
   });
   await handleResponse(response);
 }
 
 export async function refreshTemplates(): Promise<{ memoryBlocks: number; systemPrompts: number }> {
-  const response = await fetch(`${API_BASE}/templates/refresh`, { method: 'POST' });
+  const response = await apiFetch(`${API_BASE}/templates/refresh`, { method: 'POST' });
   return handleResponse(response);
 }
 
@@ -212,7 +213,7 @@ export async function refreshTemplates(): Promise<{ memoryBlocks: number; system
 // =============================================================================
 
 export async function fetchHealth(): Promise<HealthStatus> {
-  const response = await fetch(`${API_BASE}/health`);
+  const response = await apiFetch(`${API_BASE}/health`);
   return handleResponse(response);
 }
 
@@ -223,7 +224,7 @@ export async function fetchHealth(): Promise<HealthStatus> {
 const CHAT_API_BASE = '/api';
 
 export async function fetchMemoryBlocks(agentId: string): Promise<{ blocks: MemoryBlockDetail[] }> {
-  const response = await fetch(`${CHAT_API_BASE}/agents/${encodeURIComponent(agentId)}/memory`);
+  const response = await apiFetch(`${CHAT_API_BASE}/agents/${encodeURIComponent(agentId)}/memory`);
   if (!response.ok) {
     const error = await response.json();
     throw new Error(error.error || `API error: ${response.status}`);
@@ -235,7 +236,7 @@ export async function createMemoryBlock(
   agentId: string,
   data: CreateMemoryBlockRequest
 ): Promise<{ success: boolean; blockId: string }> {
-  const response = await fetch(`${CHAT_API_BASE}/agents/${encodeURIComponent(agentId)}/memory`, {
+  const response = await apiFetch(`${CHAT_API_BASE}/agents/${encodeURIComponent(agentId)}/memory`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -252,7 +253,7 @@ export async function updateMemoryBlock(
   blockLabel: string,
   value: string
 ): Promise<{ success: boolean }> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${CHAT_API_BASE}/agents/${encodeURIComponent(agentId)}/memory/${encodeURIComponent(blockLabel)}`,
     {
       method: 'POST',
@@ -271,7 +272,7 @@ export async function deleteMemoryBlock(
   agentId: string,
   blockId: string
 ): Promise<{ success: boolean }> {
-  const response = await fetch(
+  const response = await apiFetch(
     `${CHAT_API_BASE}/agents/${encodeURIComponent(agentId)}/memory/${encodeURIComponent(blockId)}`,
     { method: 'DELETE' }
   );
