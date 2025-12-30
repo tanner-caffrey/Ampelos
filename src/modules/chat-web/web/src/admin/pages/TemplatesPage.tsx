@@ -73,7 +73,7 @@ const TemplatesPage: React.FC = () => {
                 )}
                 <div className={styles.templateMeta}>
                   <span>
-                    Modules: {Object.keys(template.modules).join(', ') || 'None'}
+                    Modules: {template.modules ? Object.keys(template.modules).join(', ') || 'None' : 'None'}
                   </span>
                   <span>Variables: {template.variables.length}</span>
                 </div>

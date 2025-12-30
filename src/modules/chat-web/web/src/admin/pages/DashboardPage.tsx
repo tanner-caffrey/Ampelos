@@ -85,7 +85,7 @@ const DashboardPage: React.FC = () => {
                 </span>
                 <span className={styles.agentId}>{agent.id}</span>
                 <span className={styles.agentModules}>
-                  {Object.keys(agent.modules).join(', ') || 'No modules'}
+                  {agent.modules ? Object.keys(agent.modules).join(', ') : 'No modules'}
                 </span>
               </Link>
             ))
