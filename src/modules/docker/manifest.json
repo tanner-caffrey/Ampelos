@@ -1,0 +1,91 @@
+{
+  "name": "docker",
+  "version": "2.0.0",
+  "provides": ["tool", "service"],
+  "dependencies": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable Docker sandbox mode"
+      },
+      "image": {
+        "type": "string",
+        "default": "alpine:latest",
+        "description": "Docker image to use for the container"
+      },
+      "containerName": {
+        "type": "string",
+        "description": "Container name (auto-generated from agent ID if not provided)"
+      },
+      "workspaceHost": {
+        "type": "string",
+        "description": "Host directory to mount as workspace (required)"
+      },
+      "workspaceContainer": {
+        "type": "string",
+        "default": "/workspace",
+        "description": "Container mount point for workspace"
+      },
+      "commandTimeoutMs": {
+        "type": "number",
+        "default": 30000,
+        "description": "Default command timeout in milliseconds (30 seconds)"
+      },
+      "maxCommandTimeoutMs": {
+        "type": "number",
+        "default": 300000,
+        "description": "Maximum allowed command timeout in milliseconds (5 minutes)"
+      },
+      "maxOutputChars": {
+        "type": "number",
+        "default": 32000,
+        "description": "Maximum output characters before truncation"
+      },
+      "autoStart": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically start container on service initialization"
+      },
+      "autoPull": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically pull Docker image if not present"
+      },
+      "autoRemove": {
+        "type": "boolean",
+        "default": false,
+        "description": "Automatically remove container when stopped"
+      },
+      "lazy": {
+        "type": "boolean",
+        "default": false,
+        "description": "Lazy-load the service (don't initialize until first use)"
+      },
+      "enableBidirectional": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable container-to-agent messaging via HTTP API"
+      },
+      "ampelosApiUrl": {
+        "type": "string",
+        "description": "Ampelos API URL for container callbacks (auto-configured if not provided)"
+      },
+      "ampelosApiPort": {
+        "type": "number",
+        "default": 3005,
+        "description": "Ampelos API port for container callbacks"
+      },
+      "setupCallbackScript": {
+        "type": "boolean",
+        "default": true,
+        "description": "Automatically create callback scripts in workspace on container start"
+      }
+    },
+    "required": ["workspaceHost"]
+  },
+  "advertise": true,
+  "description": "Docker container service for isolated filesystem access, command execution, and bidirectional agent communication"
+}

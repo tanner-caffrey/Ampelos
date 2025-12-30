@@ -1,0 +1,134 @@
+.memory-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.memory-sidebar-loading,
+.memory-sidebar-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--theme-text-secondary);
+}
+
+.memory-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--theme-border);
+  font-weight: 500;
+}
+
+.refresh-button {
+  padding: 0.25rem 0.5rem;
+  background: none;
+  border: 1px solid var(--theme-border);
+  border-radius: 4px;
+  color: var(--theme-text);
+  cursor: pointer;
+  font-size: 1rem;
+
+  &:hover {
+    background: var(--theme-bg-hover);
+  }
+}
+
+.memory-blocks {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.memory-block {
+  border-bottom: 1px solid var(--theme-border);
+
+  &.flashing {
+    animation: flash 1s ease-out;
+  }
+
+  &.expanded {
+    background: var(--theme-bg-secondary);
+  }
+}
+
+.memory-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--theme-bg-hover);
+  }
+}
+
+.memory-block-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.memory-block-label {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.memory-block-toggle {
+  font-size: 0.625rem;
+  color: var(--theme-text-secondary);
+}
+
+.memory-block-progress {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.5rem;
+}
+
+.memory-block-usage {
+  font-size: 0.625rem;
+  font-family: monospace;
+  white-space: nowrap;
+}
+
+.memory-block-content {
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--theme-border);
+  background: var(--theme-bg-tertiary);
+}
+
+.memory-block-text {
+  margin: 0;
+  font-family: monospace;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--theme-text);
+  max-height: 300px;
+  overflow-y: auto;
+
+  &.diff {
+    .diff-unchanged {
+      color: var(--theme-text-secondary);
+    }
+
+    .diff-changed {
+      color: var(--theme-success);
+      background: rgba(var(--theme-success-rgb), 0.1);
+      padding: 0 2px;
+      border-radius: 2px;
+    }
+  }
+}
+
+@keyframes flash {
+  0% {
+    background: rgba(var(--theme-success-rgb), 0.3);
+  }
+  100% {
+    background: transparent;
+  }
+}

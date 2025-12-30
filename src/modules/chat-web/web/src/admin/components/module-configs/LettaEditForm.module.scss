@@ -1,0 +1,92 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.label {
+  min-width: 10ch;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.value {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.select {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+  min-width: 300px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--neon-green);
+  }
+}
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.error {
+  padding: 1rem;
+  color: var(--red);
+  background: var(--bg-secondary);
+  border: 1px solid var(--red);
+}
+
+.initOnlyNote {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-style: italic;
+  margin-top: 0.25rem;
+}
+
+.saveButton {
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--neon-green);
+  background: transparent;
+  color: var(--neon-green);
+  margin-left: 0.75rem;
+
+  &:hover:not(:disabled) {
+    background: rgba(57, 255, 68, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

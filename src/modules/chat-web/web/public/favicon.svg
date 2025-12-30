@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#000000"/>
+  <g fill="#39ff44">
+    <!-- Stylized "A" for Ampelos with vine-like curves -->
+    <path d="M256 80 L160 400 L200 400 L220 340 L292 340 L312 400 L352 400 L256 80 Z M236 300 L256 240 L276 300 Z"/>
+    <!-- Decorative vine elements -->
+    <circle cx="140" cy="320" r="12"/>
+    <circle cx="372" cy="320" r="12"/>
+    <path d="M120 340 Q100 380 120 420" stroke="#39ff44" stroke-width="8" fill="none"/>
+    <path d="M392 340 Q412 380 392 420" stroke="#39ff44" stroke-width="8" fill="none"/>
+  </g>
+</svg>

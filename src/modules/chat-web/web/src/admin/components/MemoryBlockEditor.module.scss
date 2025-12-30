@@ -1,0 +1,280 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: bold;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.addButton {
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+  transition: all 0.15s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.addForm {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.formRow {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.formField {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.formFieldSmall {
+  composes: formField;
+  flex: 0 0 100px;
+}
+
+.formLabel {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.formInput {
+  padding: 0.5rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 14px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--neon-green);
+  }
+}
+
+.formTextarea {
+  composes: formInput;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.formActions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.saveButton,
+.cancelButton {
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--text-secondary);
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.saveButton {
+  border-color: var(--neon-green);
+  color: var(--neon-green);
+
+  &:hover:not(:disabled) {
+    background: rgba(57, 255, 68, 0.1);
+  }
+}
+
+.blockList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.block {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.blockHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--bg-tertiary);
+  }
+}
+
+.blockLabel {
+  font-family: var(--font-mono);
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.blockMeta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.charCount {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+.charCountWarning {
+  composes: charCount;
+  color: var(--yellow);
+}
+
+.charCountError {
+  composes: charCount;
+  color: var(--red);
+}
+
+.expandIcon {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.blockBody {
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.blockTextarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 0.75rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  resize: vertical;
+
+  &:focus {
+    outline: none;
+    border-color: var(--neon-green);
+  }
+}
+
+.blockActions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.blockActionsLeft {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.updateButton {
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--neon-green);
+  background: transparent;
+  color: var(--neon-green);
+
+  &:hover:not(:disabled) {
+    background: rgba(57, 255, 68, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.deleteButton {
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  cursor: pointer;
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+
+  &:hover:not(:disabled) {
+    background: rgba(255, 0, 0, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.empty {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+}
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.error {
+  padding: 1rem;
+  color: var(--red);
+  background: var(--bg-secondary);
+  border: 1px solid var(--red);
+}

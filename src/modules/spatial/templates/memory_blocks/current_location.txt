@@ -1,0 +1,6 @@
+Location: void
+Position: here
+Description: An empty expanse of digital nothingness, full of potential
+Visible objects: none
+Present: you
+Adjacent: none

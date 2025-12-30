@@ -1,0 +1,23 @@
+{
+  "name": "journal",
+  "version": "0.1.0",
+  "description": "Journal system for agents to create, write to, edit, and read from personal journals stored as markdown",
+  "provides": ["tool", "service"],
+  "dependencies": ["body_and_inventory"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max_journals": {
+        "type": "number",
+        "description": "Maximum number of journals an agent can create (0 for unlimited)",
+        "default": 0
+      },
+      "max_entry_length": {
+        "type": "number",
+        "description": "Maximum character length for a single journal entry (0 for unlimited)",
+        "default": 0
+      }
+    },
+    "additionalProperties": false
+  }
+}

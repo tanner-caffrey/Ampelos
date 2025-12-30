@@ -1,0 +1,6 @@
+{
+  "name": "letta-filesystem",
+  "version": "0.1.0",
+  "provides": ["tool", "service"],
+  "description": "Manage Letta folders and files with patch-based modifications"
+}

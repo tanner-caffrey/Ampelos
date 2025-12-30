@@ -1,0 +1,25 @@
+.root {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  background: var(--bg-primary);
+  overflow: hidden;
+
+  // Make the SidebarLayout fill height and its content div
+  > div {
+    height: 100%;
+
+    // SidebarLayout's content wrapper
+    > div:last-child {
+      height: 100%;
+      overflow: hidden;
+    }
+  }
+}
+
+.content {
+  height: 100%;
+  overflow-y: auto;
+  padding: 1.5rem 2rem;
+  padding-bottom: 4rem;
+}

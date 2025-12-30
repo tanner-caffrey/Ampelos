@@ -1,0 +1,22 @@
+{
+  "name": "web-reader",
+  "version": "0.1.0",
+  "provides": ["tool", "service"],
+  "description": "Fetch web pages as clean markdown using Jina Reader API",
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "cache_ttl_minutes": {
+        "type": "number",
+        "description": "How long to cache pages in minutes (0 = forever)",
+        "default": 60
+      },
+      "max_cached_pages": {
+        "type": "number",
+        "description": "Maximum pages to cache per agent (0 = unlimited)",
+        "default": 50
+      }
+    },
+    "additionalProperties": false
+  }
+}

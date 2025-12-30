@@ -1,0 +1,22 @@
+{
+  "name": "scheduled-messages",
+  "version": "0.1.0",
+  "description": "Scheduled and recurring messages for agents - supports time-based and loop-based triggers",
+  "provides": ["tool", "service"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max_schedules": {
+        "type": "number",
+        "description": "Maximum concurrent schedules per agent (0 for unlimited)",
+        "default": 10
+      },
+      "min_interval_seconds": {
+        "type": "number",
+        "description": "Minimum allowed interval for time-based schedules in seconds",
+        "default": 60
+      }
+    },
+    "additionalProperties": false
+  }
+}

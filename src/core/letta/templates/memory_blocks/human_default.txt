@@ -1,0 +1,15 @@
+# Human Context
+
+Basic information about the person I'm conversing with.
+
+## Profile
+Name: {{name}}
+Interests: {{interests}}
+
+## Additional Context
+[This block will be enriched over time as I learn more through conversation]
+
+## Notes
+- This block should remain focused on factual, stable information
+- Emotional context and relationship dynamics belong in the relationship_context block
+- Evolving patterns and preferences can be tagged and stored in archival memory

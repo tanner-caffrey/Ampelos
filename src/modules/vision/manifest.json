@@ -1,0 +1,18 @@
+{
+  "name": "vision",
+  "version": "0.1.0",
+  "provides": ["service"],
+  "advertise": false,
+  "description": "Image description via shared Letta vision agent",
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "model": {
+        "type": "string",
+        "description": "Vision-capable model for the vision agent (OpenRouter format)",
+        "default": "anthropic/claude-sonnet-4-20250514"
+      }
+    },
+    "additionalProperties": false
+  }
+}

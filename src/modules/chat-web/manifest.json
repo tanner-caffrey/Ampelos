@@ -1,0 +1,28 @@
+{
+  "name": "chat-web",
+  "version": "1.0.0",
+  "provides": ["service"],
+  "dependencies": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "enabled": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable the chat web interface"
+      },
+      "web_port": {
+        "type": "integer",
+        "default": 3001,
+        "description": "Port for the web interface (if running separately from MCP server)"
+      },
+      "use_mcp_server": {
+        "type": "boolean",
+        "default": true,
+        "description": "Use the MCP server HTTP port instead of separate web server"
+      }
+    }
+  },
+  "advertise": false,
+  "description": "Web-based chat interface for interacting with Ampelos agents"
+}

@@ -1,0 +1,227 @@
+/**
+ * ConfigLoader Tests
+ *
+ * Tests for loading and parsing agent configurations.
+ */
+
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
+import { ConfigLoader } from '../../core/config-loader.js';
+import * as fs from 'node:fs/promises';
+import * as fsSync from 'node:fs';
+
+// Mock fs modules
+vi.mock('node:fs/promises', () => ({
+  readFile: vi.fn()
+}));
+
+vi.mock('node:fs', () => ({
+  existsSync: vi.fn()
+}));
+
+describe('ConfigLoader', () => {
+  let configLoader: ConfigLoader;
+  const mockConfigPath = '/test/configs/agents.json';
+
+  const validConfig = {
+    agents: {
+      'void-play': {
+        name: 'Void',
+        enabled: true,
+        modules: {
+          letta: { lazy: false, model: 'gpt-4' },
+          vision: { enabled: true }
+        }
+      },
+      'echo': {
+        name: 'Echo',
+        enabled: false,
+        modules: {
+          letta: { lazy: true }
+        }
+      }
+    }
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    configLoader = new ConfigLoader(mockConfigPath);
+  });
+
+  describe('load', () => {
+    it('should load and parse config file', async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+
+      await configLoader.load();
+
+      expect(fs.readFile).toHaveBeenCalledWith(mockConfigPath, 'utf-8');
+    });
+
+    it('should handle missing config file gracefully', async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(false);
+
+      await configLoader.load();
+
+      expect(configLoader.getAllAgents()).toEqual([]);
+    });
+
+    it('should throw on invalid JSON', async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue('{ invalid json }');
+
+      await expect(configLoader.load()).rejects.toThrow();
+    });
+  });
+
+  describe('getAllAgents', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return all agents', () => {
+      const agents = configLoader.getAllAgents();
+
+      expect(agents).toHaveLength(2);
+      expect(agents.map(a => a.id)).toContain('void-play');
+      expect(agents.map(a => a.id)).toContain('echo');
+    });
+  });
+
+  describe('getEnabledAgents', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return only enabled agents', () => {
+      const agents = configLoader.getEnabledAgents();
+
+      expect(agents).toHaveLength(1);
+      expect(agents[0].id).toBe('void-play');
+      expect(agents[0].enabled).toBe(true);
+    });
+  });
+
+  describe('getAgent', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return agent by ID', () => {
+      const agent = configLoader.getAgent('void-play');
+
+      expect(agent).toBeDefined();
+      expect(agent?.name).toBe('Void');
+      expect(agent?.enabled).toBe(true);
+    });
+
+    it('should return undefined for unknown agent', () => {
+      const agent = configLoader.getAgent('unknown');
+
+      expect(agent).toBeUndefined();
+    });
+  });
+
+  describe('getModuleConfig', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return module config for agent', () => {
+      const config = configLoader.getModuleConfig('void-play', 'letta');
+
+      expect(config).toEqual({ lazy: false, model: 'gpt-4' });
+    });
+
+    it('should return undefined for unknown module', () => {
+      const config = configLoader.getModuleConfig('void-play', 'unknown');
+
+      expect(config).toBeUndefined();
+    });
+
+    it('should return undefined for unknown agent', () => {
+      const config = configLoader.getModuleConfig('unknown', 'letta');
+
+      expect(config).toBeUndefined();
+    });
+  });
+
+  describe('getModuleNames', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return all module names for agent', () => {
+      const modules = configLoader.getModuleNames('void-play');
+
+      expect(modules).toContain('letta');
+      expect(modules).toContain('vision');
+    });
+
+    it('should return empty array for unknown agent', () => {
+      const modules = configLoader.getModuleNames('unknown');
+
+      expect(modules).toEqual([]);
+    });
+  });
+
+  describe('isModuleLazy', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return lazy value from config', () => {
+      expect(configLoader.isModuleLazy('void-play', 'letta')).toBe(false);
+      expect(configLoader.isModuleLazy('echo', 'letta')).toBe(true);
+    });
+
+    it('should default to true if not specified', () => {
+      expect(configLoader.isModuleLazy('void-play', 'vision')).toBe(true);
+    });
+  });
+
+  describe('isModuleEnabled', () => {
+    beforeEach(async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+      await configLoader.load();
+    });
+
+    it('should return enabled value from config', () => {
+      expect(configLoader.isModuleEnabled('void-play', 'vision')).toBe(true);
+    });
+
+    it('should default to true if not specified', () => {
+      expect(configLoader.isModuleEnabled('void-play', 'letta')).toBe(true);
+    });
+  });
+
+  describe('getConfigPath', () => {
+    it('should return the config path', () => {
+      expect(configLoader.getConfigPath()).toBe(mockConfigPath);
+    });
+  });
+
+  describe('reload', () => {
+    it('should reload configuration from file', async () => {
+      vi.mocked(fsSync.existsSync).mockReturnValue(true);
+      vi.mocked(fs.readFile).mockResolvedValue(JSON.stringify(validConfig));
+
+      await configLoader.load();
+      await configLoader.reload();
+
+      expect(fs.readFile).toHaveBeenCalledTimes(2);
+    });
+  });
+});

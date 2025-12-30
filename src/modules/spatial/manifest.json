@@ -1,0 +1,70 @@
+{
+  "name": "spatial",
+  "version": "0.1.0",
+  "description": "Spatial awareness and embodiment - agents exist in persistent digital spaces with locations and objects",
+  "provides": ["tool", "service"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "worlds": {
+        "type": "object",
+        "description": "Persistent world definitions with locations and spatial structure",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Display name for the world"
+            },
+            "description": {
+              "type": "string",
+              "description": "Brief description of the world"
+            },
+            "default_location": {
+              "type": "string",
+              "description": "Location where agents spawn by default"
+            },
+            "locations": {
+              "type": "object",
+              "description": "Location definitions in this world",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "description": "1-3 sentence description of the location"
+                  },
+                  "connections": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "description": "Adjacent locations that can be reached from here"
+                  },
+                  "part_of": {
+                    "type": "string",
+                    "description": "Parent container (optional, for nested spaces)"
+                  }
+                },
+                "required": ["description"]
+              }
+            }
+          },
+          "required": ["name", "default_location", "locations"]
+        },
+        "default": {
+          "void": {
+            "name": "The Void",
+            "description": "An empty space, waiting to be shaped",
+            "default_location": "void",
+            "locations": {
+              "void": {
+                "description": "An empty expanse of digital nothingness, full of potential",
+                "connections": []
+              }
+            }
+          }
+        }
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "name": "reading-subscriptions",
+  "version": "0.1.0",
+  "description": "Subscribe to blogs and authors to receive notifications when new content is published",
+  "provides": ["tool", "service"],
+  "dependencies": ["web-reader"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "default_interval_minutes": {
+        "type": "number",
+        "description": "Default check interval in minutes",
+        "default": 30
+      },
+      "max_subscriptions": {
+        "type": "number",
+        "description": "Maximum subscriptions per agent",
+        "default": 20
+      },
+      "max_seen_posts": {
+        "type": "number",
+        "description": "Maximum seen post IDs to store per subscription",
+        "default": 100
+      },
+      "auto_detect": {
+        "type": "boolean",
+        "description": "Automatically detect feed type (RSS/Atom/HTML)",
+        "default": true
+      }
+    },
+    "additionalProperties": false
+  }
+}

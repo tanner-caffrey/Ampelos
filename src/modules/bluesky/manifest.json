@@ -1,0 +1,122 @@
+{
+  "name": "bluesky",
+  "version": "2.0.0",
+  "description": "Bluesky/ATProto integration for Ampelos agents with DMs, follows, and notifications",
+  "provides": ["tool", "service"],
+  "dependencies": [],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "handle": {
+        "type": "string",
+        "description": "Bluesky handle (e.g., 'user.bsky.social')"
+      },
+      "service": {
+        "type": "string",
+        "description": "PDS service URL (default: 'https://bsky.social')"
+      },
+      "feeds": {
+        "type": "array",
+        "description": "Named feeds the agent can access",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "description": "Display name for the feed"
+            },
+            "uri": {
+              "type": "string",
+              "description": "AT URI of the feed generator"
+            },
+            "description": {
+              "type": "string",
+              "description": "Optional description of the feed"
+            }
+          },
+          "required": ["name", "uri"]
+        }
+      },
+      "notification_listener": {
+        "type": "object",
+        "description": "Configuration for automatic notification polling",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable/disable notification listener (default: true)",
+            "default": true
+          },
+          "pollIntervalMs": {
+            "type": "number",
+            "description": "Polling interval in milliseconds (default: 60000 = 1 minute)",
+            "default": 60000
+          },
+          "notifyTypes": {
+            "type": "array",
+            "description": "Notification types to report (default: all)",
+            "items": {
+              "type": "string",
+              "enum": ["like", "repost", "follow", "mention", "reply", "quote"]
+            }
+          }
+        }
+      },
+      "dm_listener": {
+        "type": "object",
+        "description": "Configuration for automatic DM polling",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable/disable DM listener (default: true)",
+            "default": true
+          },
+          "pollIntervalMs": {
+            "type": "number",
+            "description": "Polling interval in milliseconds (default: 10000 = 10 seconds)",
+            "default": 10000
+          }
+        }
+      },
+      "interaction_allowlist": {
+        "type": "object",
+        "description": "Unified allowlist restricting who the agent can DM, reply to, and @mention",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable interaction allowlist restriction",
+            "default": false
+          },
+          "handles": {
+            "type": "array",
+            "description": "List of handles the agent can interact with (without @ prefix)",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["enabled", "handles"]
+      },
+      "dm_allowlist": {
+        "type": "object",
+        "description": "[DEPRECATED: Use interaction_allowlist instead] Restrict which accounts the agent can send DMs to",
+        "deprecated": true,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable DM allowlist restriction",
+            "default": false
+          },
+          "handles": {
+            "type": "array",
+            "description": "List of handles that can be DMed (without @ prefix)",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["enabled", "handles"]
+      }
+    },
+    "required": ["handle"]
+  }
+}
