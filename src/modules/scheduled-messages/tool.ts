@@ -6,7 +6,7 @@
 
 import type { ToolDefinition, ToolResult } from '../../types/tool.js';
 import type ScheduledMessagesService from './service.js';
-import type { Schedule } from './service.js';
+import type { Schedule, RecurringPattern } from './service.js';
 
 /**
  * Format absolute time for display
@@ -44,6 +44,27 @@ function formatSchedule(schedule: Schedule): string {
       typeInfo = `one-time (scheduled)`;
       nextFire = `Fires at: ${formatAbsoluteTime(schedule.fire_at!)}`;
       break;
+    case 'recurring_at': {
+      const pattern = schedule.recurring_pattern;
+      if (pattern) {
+        let patternDesc = pattern.frequency;
+        if (pattern.frequency === 'weekly' && pattern.days_of_week) {
+          const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+          patternDesc += ` (${pattern.days_of_week.map(d => dayNames[d]).join(', ')})`;
+        }
+        if (pattern.frequency === 'monthly' && pattern.days_of_month) {
+          patternDesc += ` (days: ${pattern.days_of_month.join(', ')})`;
+        }
+        if (pattern.frequency === 'interval' && pattern.interval_days) {
+          patternDesc += ` (every ${pattern.interval_days} days)`;
+        }
+        typeInfo = `recurring ${patternDesc} at ${pattern.times.join(', ')}`;
+      } else {
+        typeInfo = 'recurring (pattern missing)';
+      }
+      nextFire = `Next: ${formatAbsoluteTime(schedule.fire_at!)}`;
+      break;
+    }
     default:
       typeInfo = 'unknown';
   }
@@ -132,8 +153,22 @@ Schedule types:
 - loop: Recurring every N conversation cycles
 - once_delay: One-time, fires after a delay (in N seconds/minutes/hours)
 - once_at: One-time, fires at a specific time (ISO 8601 format)
+- recurring_at: Recurring at specific times (daily, weekly, monthly, or interval-based)
 
-One-time schedules are automatically removed after firing.`,
+For recurring_at, specify a pattern with:
+- frequency: 'daily', 'weekly', 'monthly', or 'interval'
+- times: Array of times in 24-hour format ["09:00", "17:30"]
+- days_of_week: For weekly - array of days (0=Sun, 1=Mon, ..., 6=Sat)
+- days_of_month: For monthly - array of days (1-31)
+- interval_days: For interval - number of days between occurrences
+
+Examples:
+- Daily at 9am: { frequency: "daily", times: ["09:00"] }
+- Mon/Wed/Fri at 9am and 5pm: { frequency: "weekly", times: ["09:00", "17:00"], days_of_week: [1, 3, 5] }
+- 1st and 15th of month at noon: { frequency: "monthly", times: ["12:00"], days_of_month: [1, 15] }
+- Every 3 days at 8am: { frequency: "interval", times: ["08:00"], interval_days: 3 }
+
+One-time schedules (once_delay, once_at) are automatically removed after firing.`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -144,8 +179,8 @@ One-time schedules are automatically removed after firing.`,
       },
       type: {
         type: 'string',
-        enum: ['time', 'loop', 'once_delay', 'once_at'],
-        description: 'Schedule type: "time" (recurring interval), "loop" (recurring per N cycles), "once_delay" (one-time after delay), "once_at" (one-time at specific time)'
+        enum: ['time', 'loop', 'once_delay', 'once_at', 'recurring_at'],
+        description: 'Schedule type: "time" (recurring interval), "loop" (recurring per N cycles), "once_delay" (one-time after delay), "once_at" (one-time at specific time), "recurring_at" (recurring at specific times)'
       },
       interval: {
         type: 'number',
@@ -158,7 +193,38 @@ One-time schedules are automatically removed after firing.`,
       },
       fire_at: {
         type: 'string',
-        description: 'For once_at: ISO 8601 timestamp when to fire in UTC (e.g., "2024-12-17T15:00:00Z"). Timestamps without timezone suffix are treated as UTC.'
+        description: 'For once_at: ISO 8601 timestamp when to fire (e.g., "2024-12-17T15:00:00Z" or "2024-12-17T15:00:00-05:00"). Timestamps without timezone are interpreted as server local time and converted to UTC.'
+      },
+      recurring_pattern: {
+        type: 'object',
+        description: 'For recurring_at: pattern definition',
+        properties: {
+          frequency: {
+            type: 'string',
+            enum: ['daily', 'weekly', 'monthly', 'interval'],
+            description: 'Recurrence frequency'
+          },
+          times: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Times of day in HH:MM format (24-hour), e.g., ["09:00", "17:30"]'
+          },
+          days_of_week: {
+            type: 'array',
+            items: { type: 'number' },
+            description: 'For weekly: days 0-6 (0=Sunday), e.g., [1, 3, 5] for Mon/Wed/Fri'
+          },
+          days_of_month: {
+            type: 'array',
+            items: { type: 'number' },
+            description: 'For monthly: days 1-31, e.g., [1, 15] for 1st and 15th'
+          },
+          interval_days: {
+            type: 'number',
+            description: 'For interval: days between occurrences, e.g., 3 for every 3 days'
+          }
+        },
+        required: ['frequency', 'times']
       },
       message: {
         type: 'string',
@@ -193,7 +259,7 @@ One-time schedules are automatically removed after firing.`,
           if (!type) {
             return {
               isError: true,
-              content: [{ type: 'text', text: 'Error: type is required (time, loop, once_delay, or once_at)' }]
+              content: [{ type: 'text', text: 'Error: type is required (time, loop, once_delay, once_at, or recurring_at)' }]
             };
           }
           if (!message) {
@@ -208,7 +274,21 @@ One-time schedules are automatically removed after firing.`,
             if (!fireAt) {
               return {
                 isError: true,
-                content: [{ type: 'text', text: 'Error: fire_at is required for once_at type (ISO 8601 format in UTC, e.g., "2024-12-17T15:00:00Z")' }]
+                content: [{ type: 'text', text: 'Error: fire_at is required for once_at type (ISO 8601 format, e.g., "2024-12-17T15:00:00Z" or "2024-12-17T15:00:00")' }]
+              };
+            }
+          } else if (type === 'recurring_at') {
+            const recurringPattern = params.recurring_pattern as RecurringPattern | undefined;
+            if (!recurringPattern) {
+              return {
+                isError: true,
+                content: [{ type: 'text', text: 'Error: recurring_pattern is required for recurring_at type' }]
+              };
+            }
+            if (!recurringPattern.frequency || !recurringPattern.times || recurringPattern.times.length === 0) {
+              return {
+                isError: true,
+                content: [{ type: 'text', text: 'Error: recurring_pattern requires frequency and at least one time' }]
               };
             }
           } else {
@@ -230,6 +310,7 @@ One-time schedules are automatically removed after firing.`,
             type,
             interval: intervalSeconds,
             fire_at: fireAt,
+            recurring_pattern: params.recurring_pattern as RecurringPattern | undefined,
             message,
             role
           });
@@ -257,6 +338,30 @@ The message will be sent at the specified time and the schedule will be automati
 **Message:** "${message}"
 
 The message will be sent in ${delayDisplay} and the schedule will be automatically removed.`;
+          } else if (type === 'recurring_at') {
+            const pattern = schedule.recurring_pattern!;
+            let patternDesc: string = pattern.frequency;
+            if (pattern.frequency === 'weekly' && pattern.days_of_week) {
+              const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+              patternDesc += ` on ${pattern.days_of_week.map(d => dayNames[d]).join(', ')}`;
+            }
+            if (pattern.frequency === 'monthly' && pattern.days_of_month) {
+              patternDesc += ` on day${pattern.days_of_month.length > 1 ? 's' : ''} ${pattern.days_of_month.join(', ')}`;
+            }
+            if (pattern.frequency === 'interval' && pattern.interval_days) {
+              patternDesc = `every ${pattern.interval_days} day${pattern.interval_days > 1 ? 's' : ''}`;
+            }
+            responseText = `Recurring schedule created!
+
+**ID:** ${schedule.id}
+**Type:** recurring_at
+**Pattern:** ${patternDesc}
+**Times:** ${pattern.times.join(', ')}
+**Role:** ${schedule.role}
+**Message:** "${message}"
+**Next fire:** ${formatAbsoluteTime(schedule.fire_at!)}
+
+This schedule will repeat according to the pattern until stopped.`;
           } else {
             // Recurring types (time, loop)
             const intervalDisplay = type === 'time'

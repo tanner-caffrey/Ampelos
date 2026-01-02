@@ -16,11 +16,55 @@ import { createComponentLogger } from '../../core/logger.js';
 const SERVICE_NAME = 'scheduled-messages';
 const log = createComponentLogger('ScheduledMessages');
 
+// Maximum safe delay for setTimeout (24 days in ms, safely under 2^31-1)
+const MAX_TIMEOUT_MS = 24 * 24 * 60 * 60 * 1000; // ~2.07 billion ms
+
+/**
+ * Defines a recurring schedule pattern for recurring_at type.
+ * Times are interpreted in server local time.
+ */
+export interface RecurringPattern {
+  /**
+   * Frequency of recurrence
+   * - daily: fires every day at specified times
+   * - weekly: fires on specific days of the week
+   * - monthly: fires on specific days of the month
+   * - interval: fires every N days
+   */
+  frequency: 'daily' | 'weekly' | 'monthly' | 'interval';
+
+  /**
+   * Times of day to fire (24-hour format: "HH:MM")
+   * Examples: ["09:00", "17:30"]
+   */
+  times: string[];
+
+  /**
+   * For 'weekly': days of week (0=Sunday, 1=Monday, ..., 6=Saturday)
+   * Examples: [1, 3, 5] for Mon/Wed/Fri
+   */
+  days_of_week?: number[];
+
+  /**
+   * For 'monthly': days of month (1-31)
+   * Examples: [1, 15] for 1st and 15th
+   * If day doesn't exist in month (e.g., 31 in February), skips that occurrence.
+   */
+  days_of_month?: number[];
+
+  /**
+   * For 'interval': number of days between occurrences
+   * Example: 3 for every 3 days
+   */
+  interval_days?: number;
+}
+
 export interface Schedule {
   id: string;
-  type: 'time' | 'loop' | 'once_delay' | 'once_at';
-  interval: number; // seconds for time-based/once_delay, loop count for loop-based, ignored for once_at
-  fire_at?: string; // ISO 8601 timestamp for once_at type
+  type: 'time' | 'loop' | 'once_delay' | 'once_at' | 'recurring_at';
+  interval: number; // seconds for time-based/once_delay, loop count for loop-based, ignored for once_at/recurring_at
+  fire_at?: string; // ISO 8601 timestamp for once_at; pre-calculated next fire time for recurring_at
+  recurring_pattern?: RecurringPattern; // Pattern definition for recurring_at type
   message: string;
   role: 'user' | 'system';
   enabled: boolean;
@@ -41,9 +85,10 @@ export interface ScheduledMessagesConfig {
 }
 
 export interface CreateScheduleOptions {
-  type: 'time' | 'loop' | 'once_delay' | 'once_at';
-  interval?: number; // Required for time/loop/once_delay, ignored for once_at
+  type: 'time' | 'loop' | 'once_delay' | 'once_at' | 'recurring_at';
+  interval?: number; // Required for time/loop/once_delay, ignored for once_at/recurring_at
   fire_at?: string;  // Required for once_at (ISO 8601 timestamp)
+  recurring_pattern?: RecurringPattern; // Required for recurring_at
   message: string;
   role?: 'user' | 'system';
 }
@@ -214,6 +259,45 @@ class ScheduledMessagesService implements BaseService {
           log.info('Resuming one-time schedule', { scheduleId: schedule.id, agentId, fireAt: schedule.fire_at });
           this.startOneTimeTimer(agentId, schedule, remaining);
         }
+      } else if (schedule.type === 'recurring_at') {
+        // Recurring pattern schedule
+        const fireTime = schedule.fire_at ? new Date(schedule.fire_at).getTime() : 0;
+
+        if (now >= fireTime) {
+          // Missed occurrence - fire now, then calculate and schedule next
+          log.info('Firing missed recurring_at schedule', {
+            scheduleId: schedule.id,
+            agentId,
+            missed_fire_at: schedule.fire_at
+          });
+
+          // Fire the missed occurrence
+          await this.fireSchedule(agentId, schedule, false);
+
+          // Calculate next occurrence from now
+          if (schedule.recurring_pattern) {
+            const nextFireTime = this.calculateNextRecurringFire(schedule.recurring_pattern, new Date());
+            if (nextFireTime) {
+              schedule.fire_at = nextFireTime;
+              const delay = new Date(nextFireTime).getTime() - Date.now();
+              this.startRecurringAtTimer(agentId, schedule, delay);
+              log.info('Rescheduled recurring_at after missed fire', {
+                scheduleId: schedule.id,
+                next_fire_at: nextFireTime
+              });
+            }
+          }
+        } else {
+          // Not yet time - resume with remaining time
+          const remaining = fireTime - now;
+          log.info('Resuming recurring_at schedule', {
+            scheduleId: schedule.id,
+            agentId,
+            fireAt: schedule.fire_at,
+            firesInSeconds: Math.round(remaining / 1000)
+          });
+          this.startRecurringAtTimer(agentId, schedule, remaining);
+        }
       }
       // 'loop' type has no timer to restore - handled by onLoopComplete callbacks
     }
@@ -259,17 +343,251 @@ class ScheduledMessagesService implements BaseService {
   }
 
   /**
-   * Start a one-time timer that fires once and auto-removes the schedule
+   * Start a one-time timer that fires once and auto-removes the schedule.
+   * Handles long delays (> 24 days) by chaining multiple timers to avoid
+   * setTimeout's 32-bit integer overflow (~24.85 days max).
    */
   private startOneTimeTimer(agentId: AgentId, schedule: Schedule, delayMs: number): void {
-    const timeout = setTimeout(async () => {
-      await this.fireSchedule(agentId, schedule, true); // true = remove after fire
-    }, delayMs);
+    if (delayMs > MAX_TIMEOUT_MS) {
+      // Delay exceeds safe setTimeout limit - chain timers
+      log.info('Long delay detected, using chained timer', {
+        scheduleId: schedule.id,
+        agentId,
+        totalDelayMs: delayMs,
+        totalDelayDays: (delayMs / 1000 / 60 / 60 / 24).toFixed(1),
+        nextCheckMs: MAX_TIMEOUT_MS
+      });
 
+      const timeout = setTimeout(() => {
+        // Recalculate remaining delay based on actual fire_at time
+        // This is more accurate than subtracting MAX_TIMEOUT_MS
+        const remaining = schedule.fire_at
+          ? new Date(schedule.fire_at).getTime() - Date.now()
+          : delayMs - MAX_TIMEOUT_MS;
+
+        if (remaining <= 0) {
+          // Time to fire
+          this.fireSchedule(agentId, schedule, true);
+        } else {
+          // Set another timer for remaining time
+          this.startOneTimeTimer(agentId, schedule, remaining);
+        }
+      }, MAX_TIMEOUT_MS);
+
+      const timers = this.agentTimers.get(agentId);
+      if (timers) {
+        timers.set(schedule.id, timeout);
+      }
+    } else {
+      // Normal case - delay is within safe limits
+      const timeout = setTimeout(async () => {
+        await this.fireSchedule(agentId, schedule, true); // true = remove after fire
+      }, delayMs);
+
+      const timers = this.agentTimers.get(agentId);
+      if (timers) {
+        timers.set(schedule.id, timeout);
+      }
+    }
+  }
+
+  /**
+   * Calculate the next fire time for a recurring_at schedule.
+   * All calculations use server local time.
+   *
+   * @param pattern The recurring pattern
+   * @param afterTime Calculate next fire after this time (default: now)
+   * @returns ISO 8601 UTC timestamp of next fire, or null if no valid next time
+   */
+  private calculateNextRecurringFire(
+    pattern: RecurringPattern,
+    afterTime: Date = new Date()
+  ): string | null {
+    const candidates: Date[] = [];
+    const now = afterTime;
+
+    // Check times for today and next 366 days (covers yearly edge cases)
+    for (let dayOffset = 0; dayOffset <= 366; dayOffset++) {
+      const checkDate = new Date(now);
+      checkDate.setDate(checkDate.getDate() + dayOffset);
+
+      // Check if this day matches the pattern
+      if (!this.isDayMatchingPattern(checkDate, pattern, now)) {
+        continue;
+      }
+
+      // Check each time slot for this day
+      for (const timeStr of pattern.times) {
+        const [hours, minutes] = timeStr.split(':').map(Number);
+        const candidate = new Date(checkDate);
+        candidate.setHours(hours, minutes, 0, 0);
+
+        // Verify the time wasn't shifted by DST (time might not exist)
+        if (candidate.getHours() !== hours || candidate.getMinutes() !== minutes) {
+          // DST gap - this time doesn't exist today, skip
+          continue;
+        }
+
+        // Must be in the future (with small buffer for race conditions)
+        if (candidate.getTime() > now.getTime() + 1000) {
+          candidates.push(candidate);
+        }
+      }
+
+      // Stop once we have at least one candidate
+      if (candidates.length > 0) {
+        break;
+      }
+    }
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    // Return earliest candidate as UTC ISO string
+    const earliest = candidates.sort((a, b) => a.getTime() - b.getTime())[0];
+    return earliest.toISOString();
+  }
+
+  /**
+   * Check if a given date matches the recurring pattern's day criteria.
+   */
+  private isDayMatchingPattern(
+    date: Date,
+    pattern: RecurringPattern,
+    referenceTime: Date
+  ): boolean {
+    switch (pattern.frequency) {
+      case 'daily':
+        return true;
+
+      case 'weekly':
+        if (!pattern.days_of_week || pattern.days_of_week.length === 0) {
+          return true; // No days specified = every day
+        }
+        return pattern.days_of_week.includes(date.getDay());
+
+      case 'monthly':
+        if (!pattern.days_of_month || pattern.days_of_month.length === 0) {
+          return true;
+        }
+        return pattern.days_of_month.includes(date.getDate());
+
+      case 'interval':
+        if (!pattern.interval_days || pattern.interval_days <= 0) {
+          return true;
+        }
+        // Calculate days since reference time
+        const refStart = new Date(referenceTime);
+        refStart.setHours(0, 0, 0, 0);
+        const checkStart = new Date(date);
+        checkStart.setHours(0, 0, 0, 0);
+        const daysDiff = Math.floor(
+          (checkStart.getTime() - refStart.getTime()) / (24 * 60 * 60 * 1000)
+        );
+        return daysDiff >= 0 && daysDiff % pattern.interval_days === 0;
+
+      default:
+        return false;
+    }
+  }
+
+  /**
+   * Start a timer for recurring_at schedule.
+   * Uses setTimeout to next occurrence, then reschedules after firing.
+   * Handles long delays via chaining (same as startOneTimeTimer).
+   */
+  private startRecurringAtTimer(agentId: AgentId, schedule: Schedule, delayMs: number): void {
+    // Clear any existing timer for this schedule
     const timers = this.agentTimers.get(agentId);
     if (timers) {
-      timers.set(schedule.id, timeout);
+      const existingTimer = timers.get(schedule.id);
+      if (existingTimer) {
+        clearTimeout(existingTimer);
+      }
     }
+
+    if (delayMs > MAX_TIMEOUT_MS) {
+      // Long delay - chain timers
+      log.info('Long delay for recurring_at, using chained timer', {
+        scheduleId: schedule.id,
+        agentId,
+        totalDelayMs: delayMs,
+        totalDelayDays: (delayMs / 1000 / 60 / 60 / 24).toFixed(1)
+      });
+
+      const timeout = setTimeout(() => {
+        const remaining = schedule.fire_at
+          ? new Date(schedule.fire_at).getTime() - Date.now()
+          : delayMs - MAX_TIMEOUT_MS;
+
+        if (remaining <= 0) {
+          // Time to fire
+          this.fireRecurringSchedule(agentId, schedule);
+        } else {
+          // Chain another timer
+          this.startRecurringAtTimer(agentId, schedule, remaining);
+        }
+      }, MAX_TIMEOUT_MS);
+
+      if (timers) {
+        timers.set(schedule.id, timeout);
+      }
+    } else {
+      // Normal case
+      const timeout = setTimeout(async () => {
+        await this.fireRecurringSchedule(agentId, schedule);
+      }, delayMs);
+
+      if (timers) {
+        timers.set(schedule.id, timeout);
+      }
+    }
+  }
+
+  /**
+   * Fire a recurring_at schedule and reschedule for next occurrence.
+   * Unlike once_at, this does NOT remove the schedule after firing.
+   */
+  private async fireRecurringSchedule(agentId: AgentId, schedule: Schedule): Promise<void> {
+    // Fire the schedule (reuse existing fireSchedule, but don't remove)
+    await this.fireSchedule(agentId, schedule, false); // false = don't remove
+
+    // Calculate next fire time
+    const state = this.getAgentState(agentId);
+    const stateSchedule = state.schedules[schedule.id];
+
+    if (!stateSchedule || !stateSchedule.enabled || !stateSchedule.recurring_pattern) {
+      return;
+    }
+
+    const nextFireTime = this.calculateNextRecurringFire(
+      stateSchedule.recurring_pattern,
+      new Date() // Calculate from now (just after firing)
+    );
+
+    if (!nextFireTime) {
+      log.warn('Could not calculate next fire time for recurring_at', {
+        scheduleId: schedule.id,
+        agentId
+      });
+      return;
+    }
+
+    // Update schedule with new fire_at
+    stateSchedule.fire_at = nextFireTime;
+    this.saveAgentState(agentId, state);
+
+    log.info('Rescheduled recurring_at for next occurrence', {
+      scheduleId: schedule.id,
+      agentId,
+      next_fire_at_utc: nextFireTime,
+      next_fire_at_local: new Date(nextFireTime).toLocaleString()
+    });
+
+    // Set timer for next occurrence
+    const delay = new Date(nextFireTime).getTime() - Date.now();
+    this.startRecurringAtTimer(agentId, schedule, delay);
   }
 
   /**
@@ -317,6 +635,24 @@ class ScheduledMessagesService implements BaseService {
 
       // Prefix message to identify it as scheduled
       const prefixedMessage = `[SCHEDULED] ${schedule.message}`;
+
+      // Diagnostic logging for once_at schedules
+      if (schedule.type === 'once_at' && schedule.fire_at) {
+        const nowMs = Date.now();
+        const expectedFireMs = new Date(schedule.fire_at).getTime();
+        const driftMs = nowMs - expectedFireMs;
+        log.info('once_at schedule FIRING - timing analysis', {
+          scheduleId: schedule.id,
+          agentId,
+          expected_fire_at_utc: schedule.fire_at,
+          expected_fire_at_local: new Date(expectedFireMs).toLocaleString(),
+          actual_fire_time_utc: new Date(nowMs).toISOString(),
+          actual_fire_time_local: new Date(nowMs).toLocaleString(),
+          drift_ms: driftMs,
+          drift_human: `${Math.abs(driftMs / 1000 / 60).toFixed(1)} minutes ${driftMs >= 0 ? 'LATE' : 'EARLY'}`,
+          created_at: schedule.created_at
+        });
+      }
 
       log.info('Firing schedule', { scheduleId: schedule.id, agentId, type: schedule.type, role: schedule.role });
 
@@ -378,20 +714,125 @@ class ScheduledMessagesService implements BaseService {
       if (!options.fire_at) {
         throw new Error('fire_at timestamp is required for once_at type');
       }
-      // Normalize timestamp: if no timezone specified, treat as UTC
+
+      // Diagnostic logging for timestamp debugging
+      const nowMs = Date.now();
+      const nowUtc = new Date(nowMs).toISOString();
+      const nowLocal = new Date(nowMs).toLocaleString();
+      log.info('once_at schedule creation - raw input', {
+        agentId,
+        raw_fire_at: options.fire_at,
+        current_time_utc: nowUtc,
+        current_time_local: nowLocal,
+        server_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+
+      // Normalize timestamp: if no timezone specified, treat as LOCAL time and convert to UTC
       let normalizedFireAt = options.fire_at;
       if (!options.fire_at.endsWith('Z') && !options.fire_at.match(/[+-]\d{2}:\d{2}$/)) {
-        normalizedFireAt = options.fire_at + 'Z';
+        // Parse as local time (JavaScript's default for strings without timezone)
+        const localDate = new Date(options.fire_at);
+        if (!isNaN(localDate.getTime())) {
+          // Convert to UTC ISO string
+          normalizedFireAt = localDate.toISOString();
+          log.info('once_at schedule creation - normalized timestamp (local to UTC)', {
+            agentId,
+            original: options.fire_at,
+            interpreted_as_local: localDate.toLocaleString(),
+            normalized_utc: normalizedFireAt,
+            server_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+          });
+        } else {
+          // Fallback: just add Z if parsing failed (will be caught by validation below)
+          normalizedFireAt = options.fire_at + 'Z';
+        }
       }
       options.fire_at = normalizedFireAt;
 
       const fireTime = new Date(normalizedFireAt).getTime();
       if (isNaN(fireTime)) {
-        throw new Error('Invalid fire_at timestamp. Use ISO 8601 format (e.g., 2024-12-17T15:00:00Z)');
+        throw new Error('Invalid fire_at timestamp. Use ISO 8601 format (e.g., 2024-12-17T15:00:00Z or 2024-12-17T15:00:00)');
       }
+
+      const delayMs = fireTime - nowMs;
+      log.info('once_at schedule creation - timing calculation', {
+        agentId,
+        fire_at_parsed_utc: new Date(fireTime).toISOString(),
+        fire_at_parsed_local: new Date(fireTime).toLocaleString(),
+        delay_ms: delayMs,
+        delay_human: delayMs > 0
+          ? `${Math.floor(delayMs / 1000 / 60)} minutes ${Math.floor((delayMs / 1000) % 60)} seconds`
+          : 'NEGATIVE (in the past!)'
+      });
+
       if (fireTime <= Date.now()) {
         throw new Error('fire_at must be in the future');
       }
+    } else if (options.type === 'recurring_at') {
+      if (!options.recurring_pattern) {
+        throw new Error('recurring_pattern is required for recurring_at type');
+      }
+
+      const pattern = options.recurring_pattern;
+
+      // Validate frequency
+      if (!['daily', 'weekly', 'monthly', 'interval'].includes(pattern.frequency)) {
+        throw new Error('Invalid frequency. Must be daily, weekly, monthly, or interval');
+      }
+
+      // Validate times array
+      if (!pattern.times || pattern.times.length === 0) {
+        throw new Error('At least one time must be specified in times array');
+      }
+
+      // Validate time format (HH:MM)
+      const timeRegex = /^([01]?[0-9]|2[0-3]):([0-5][0-9])$/;
+      for (const time of pattern.times) {
+        if (!timeRegex.test(time)) {
+          throw new Error(`Invalid time format "${time}". Use HH:MM (24-hour format)`);
+        }
+      }
+
+      // Validate frequency-specific fields
+      if (pattern.frequency === 'weekly' && pattern.days_of_week) {
+        for (const day of pattern.days_of_week) {
+          if (day < 0 || day > 6) {
+            throw new Error('days_of_week must be 0-6 (0=Sunday)');
+          }
+        }
+      }
+
+      if (pattern.frequency === 'monthly' && pattern.days_of_month) {
+        for (const day of pattern.days_of_month) {
+          if (day < 1 || day > 31) {
+            throw new Error('days_of_month must be 1-31');
+          }
+        }
+      }
+
+      if (pattern.frequency === 'interval') {
+        if (!pattern.interval_days || pattern.interval_days < 1) {
+          throw new Error('interval_days must be at least 1 for interval frequency');
+        }
+      }
+
+      // Calculate first fire time
+      const firstFireTime = this.calculateNextRecurringFire(pattern);
+      if (!firstFireTime) {
+        throw new Error('Could not calculate next fire time for the given pattern');
+      }
+
+      // Log for debugging
+      log.info('recurring_at schedule creation', {
+        agentId,
+        pattern,
+        first_fire_at_utc: firstFireTime,
+        first_fire_at_local: new Date(firstFireTime).toLocaleString(),
+        server_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      });
+
+      // Store the calculated fire_at
+      options.fire_at = firstFireTime;
     }
 
     // Create schedule
@@ -400,6 +841,7 @@ class ScheduledMessagesService implements BaseService {
       type: options.type,
       interval: options.interval || 0,
       fire_at: options.fire_at,
+      recurring_pattern: options.recurring_pattern,
       message: options.message,
       role: options.role || 'user',
       enabled: true,
@@ -419,13 +861,16 @@ class ScheduledMessagesService implements BaseService {
     } else if (schedule.type === 'once_at') {
       const delay = new Date(schedule.fire_at!).getTime() - Date.now();
       this.startOneTimeTimer(agentId, schedule, delay);
+    } else if (schedule.type === 'recurring_at') {
+      const delay = new Date(schedule.fire_at!).getTime() - Date.now();
+      this.startRecurringAtTimer(agentId, schedule, delay);
     }
     // 'loop' type has no timer - handled in onLoopComplete
 
     // Persist state
     this.saveAgentState(agentId, state);
 
-    const logMeta = schedule.type === 'once_at'
+    const logMeta = schedule.type === 'once_at' || schedule.type === 'recurring_at'
       ? { fireAt: schedule.fire_at }
       : { interval: schedule.interval };
     log.info('Created schedule', { scheduleId: schedule.id, agentId, type: schedule.type, ...logMeta });
