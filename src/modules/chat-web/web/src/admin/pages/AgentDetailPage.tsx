@@ -14,6 +14,7 @@ import EmbodimentStateEditor from '../components/module-configs/EmbodimentStateE
 import MemoryBlockEditor from '../components/MemoryBlockEditor';
 import LLMConfigSection from '../components/LLMConfigSection';
 import ToolManager from '../components/ToolManager';
+import * as api from '../api/adminClient';
 import styles from './AgentDetailPage.module.scss';
 
 // Modules that require configuration before being added
@@ -26,8 +27,29 @@ const AgentDetailPage: React.FC = () => {
     useAgent(agentId);
   const { modules: availableModules } = useAvailableModules();
 
-  // Memory blocks and LLM config - Letta is core infrastructure, available for all enabled agents
-  const hasLetta = agent?.enabled ?? false;
+  // Check if Letta agent exists by looking at state
+  const lettaState = state?.letta as { letta_agent_id?: string; initialized?: boolean } | undefined;
+  const hasLettaAgent = Boolean(lettaState?.letta_agent_id);
+  const [creatingLetta, setCreatingLetta] = useState(false);
+  const [lettaError, setLettaError] = useState<string | null>(null);
+
+  const handleCreateLettaAgent = async () => {
+    if (!agentId) return;
+    setCreatingLetta(true);
+    setLettaError(null);
+    try {
+      await api.createLettaAgent(agentId);
+      await refetch();
+    } catch (err) {
+      console.error('Failed to create Letta agent:', err);
+      setLettaError(err instanceof Error ? err.message : 'Failed to create Letta agent');
+    } finally {
+      setCreatingLetta(false);
+    }
+  };
+
+  // Memory blocks and LLM config - only available when Letta agent exists
+  const hasLetta = hasLettaAgent;
   const {
     blocks: memoryBlocks,
     loading: loadingMemory,
@@ -252,7 +274,11 @@ const AgentDetailPage: React.FC = () => {
     return new Date(dateStr).toLocaleString();
   };
 
-  const agentModuleNames = agent?.modules ?? [];
+  // Derive module names from state keys (modules with state for this agent)
+  // Fall back to agent.modules if state is empty (backward compatibility)
+  const agentModuleNames = state && Object.keys(state).length > 0
+    ? Object.keys(state)
+    : (agent?.modules ?? []);
   const availableToAdd = availableModules.filter((m) => !agentModuleNames.includes(m.name));
 
   if (loading) {
@@ -346,7 +372,36 @@ const AgentDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Memory Blocks Section - Letta is core infrastructure for all enabled agents */}
+      {/* Letta Agent Section */}
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>Letta Agent</h2>
+        <div className={styles.card}>
+          {hasLettaAgent ? (
+            <div className={styles.field}>
+              <span className={styles.label}>Letta Agent ID</span>
+              <span className={styles.value}>{lettaState?.letta_agent_id}</span>
+            </div>
+          ) : (
+            <div className={styles.lettaNotCreated}>
+              <p className={styles.lettaMessage}>
+                No Letta agent has been created for this agent yet.
+              </p>
+              {lettaError && (
+                <p className={styles.lettaError}>{lettaError}</p>
+              )}
+              <button
+                onClick={handleCreateLettaAgent}
+                disabled={creatingLetta}
+                className={styles.createLettaButton}
+              >
+                {creatingLetta ? 'Creating...' : 'Create Letta Agent'}
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Memory Blocks Section - only available when Letta agent exists */}
       {hasLetta && (
         <div className={styles.section}>
           <h2 className={styles.sectionTitle}>Memory Blocks</h2>

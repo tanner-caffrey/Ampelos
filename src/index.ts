@@ -48,6 +48,7 @@ import { MCPServer } from './core/server.js';
 import { TemplateRegistry } from './core/template-registry.js';
 import { ToolManager } from './core/tool-manager.js';
 import { lettaManager } from './core/letta/index.js';
+import type { LettaState } from './core/letta/types.js';
 
 async function main() {
   try {
@@ -135,7 +136,7 @@ async function main() {
     await serviceManager.initializeServices();
     mainLog.info('Service singletons initialized');
 
-    // Initialize Letta for all enabled agents with Letta config
+    // Reconnect to existing Letta agents (don't auto-create missing ones)
     const enabledAgents = agentRegistry.getEnabledAgents();
 
     // Preload letta state for all enabled agents
@@ -144,19 +145,29 @@ async function main() {
       await stateManager.preloadAgentState(agent.agent_id, ['letta']);
     }
 
+    let connectedCount = 0;
+    let missingCount = 0;
     for (const agent of enabledAgents) {
-      const lettaConfig = configLoader.getLettaConfig(agent.agent_id);
       try {
-        await lettaManager.initAgent(agent.agent_id, lettaConfig);
+        // Only pass config if we can reconnect (existing letta_agent_id)
+        // This prevents auto-creation on startup - agents must be created via admin UI
+        const lettaState = stateManager.getLettaState<LettaState>(agent.agent_id).get();
+        if (lettaState?.letta_agent_id) {
+          await lettaManager.initAgent(agent.agent_id);
+          connectedCount++;
+        } else {
+          missingCount++;
+          mainLog.debug(`Agent ${agent.agent_id} has no Letta agent - create via admin UI`);
+        }
       } catch (error) {
         const err = error as Error;
-        mainLog.error(`Failed to init Letta agent ${agent.agent_id}`, {
+        mainLog.warn(`Failed to reconnect Letta agent ${agent.agent_id}`, {
           error: err.message,
-          stack: err.stack,
         });
+        missingCount++;
       }
     }
-    mainLog.info('Letta agents initialized');
+    mainLog.info(`Letta agents: ${connectedCount} connected, ${missingCount} need creation via admin UI`);
 
     // Eager-init services for agents with existing state (restores polling, timers, etc.)
     await serviceManager.eagerInitializeServicesWithState();

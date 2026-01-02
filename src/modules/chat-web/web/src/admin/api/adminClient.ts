@@ -114,6 +114,13 @@ export async function disableAgent(agentId: string): Promise<{ agent: AgentDefin
   return handleResponse(response);
 }
 
+export async function createLettaAgent(agentId: string): Promise<{ letta_agent_id: string }> {
+  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/create-letta`, {
+    method: 'POST',
+  });
+  return handleResponse(response);
+}
+
 // =============================================================================
 // Module APIs
 // =============================================================================

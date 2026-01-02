@@ -120,43 +120,91 @@
   }
 }
 
-.moduleGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+.section {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+
+  &:last-of-type {
+    border-bottom: none;
+  }
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--neon-green);
+  font-family: var(--font-mono);
+  margin-bottom: 0.5rem;
+}
+
+.sectionHint {
+  display: block;
+  margin-bottom: 1rem;
+  font-size: 13px;
+  color: var(--text-tertiary);
+}
+
+.moduleList {
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
 }
 
-.moduleOption {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem;
+.moduleItem {
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
+}
+
+.moduleHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem;
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition: background-color 0.15s ease;
 
   &:hover {
-    border-color: var(--border-hover);
+    background: rgba(255, 255, 255, 0.02);
   }
 
-  input {
-    width: 14px;
-    height: 14px;
-    cursor: pointer;
+  &.expanded {
+    border-bottom: 1px solid var(--border-color);
   }
+}
+
+.expandIcon {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  width: 1rem;
+}
+
+.moduleInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
 }
 
 .moduleName {
   font-family: var(--font-mono);
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.moduleDescription {
+  font-size: 12px;
+  color: var(--text-tertiary);
 }
 
 .moduleVersion {
   font-size: 11px;
   color: var(--text-tertiary);
   margin-left: auto;
+}
+
+.moduleConfigWrapper {
+  padding: 1rem;
 }
 
 .createButton {

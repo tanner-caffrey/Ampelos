@@ -370,3 +370,43 @@
   color: var(--text-tertiary);
   font-family: var(--font-mono);
 }
+
+.lettaNotCreated {
+  padding: 1rem 0;
+}
+
+.lettaMessage {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0 0 1rem 0;
+}
+
+.lettaError {
+  color: var(--red);
+  font-size: 13px;
+  margin: 0 0 1rem 0;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid var(--red);
+}
+
+.createLettaButton {
+  padding: 0.5rem 1rem;
+  background: var(--neon-green);
+  border: none;
+  color: var(--black-100);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+
+  &:hover:not(:disabled) {
+    opacity: 0.9;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}

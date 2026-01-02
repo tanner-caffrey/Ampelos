@@ -27,9 +27,42 @@ const DEFAULT_STATE: BodyAndInventoryState = {
   letta_memory_block_created: false
 };
 
+/**
+ * Simple per-agent lock to prevent concurrent state modifications.
+ * When multiple tool calls fire at once, this ensures they execute sequentially
+ * to avoid race conditions in read-modify-write operations.
+ */
+class AgentLock {
+  private locks: Map<AgentId, Promise<void>> = new Map();
+
+  async acquire(agentId: AgentId): Promise<() => void> {
+    // Wait for any existing lock to release
+    const existingLock = this.locks.get(agentId);
+    if (existingLock) {
+      await existingLock;
+    }
+
+    // Create a new lock with a resolver
+    let resolver: () => void;
+    const lockPromise = new Promise<void>((resolve) => {
+      resolver = resolve;
+    });
+    this.locks.set(agentId, lockPromise);
+
+    // Return release function
+    return () => {
+      if (this.locks.get(agentId) === lockPromise) {
+        this.locks.delete(agentId);
+      }
+      resolver!();
+    };
+  }
+}
+
 class BodyAndInventoryService implements BaseService {
   private context?: ServiceContext;
   private agentConfigs: Map<AgentId, BodyAndInventoryConfig> = new Map();
+  private agentLock = new AgentLock();
 
   /**
    * Initialize the service (global, once at startup)
@@ -130,6 +163,19 @@ class BodyAndInventoryService implements BaseService {
   private getLettaManager(): LettaManager | undefined {
     if (!this.context) return undefined;
     return this.context.getLettaManager?.();
+  }
+
+  /**
+   * Execute an operation with the agent lock held.
+   * This prevents concurrent state modifications for the same agent.
+   */
+  private async withLock<T>(agentId: AgentId, operation: () => Promise<T>): Promise<T> {
+    const release = await this.agentLock.acquire(agentId);
+    try {
+      return await operation();
+    } finally {
+      release();
+    }
   }
 
   private initializeDefaultBodyParts(config: BodyAndInventoryConfig): Record<string, BodyPart> {
@@ -261,22 +307,24 @@ class BodyAndInventoryService implements BaseService {
   // ===== Body Management Methods =====
 
   async createBodyPart(agentId: AgentId, partName: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
 
-    if (state.body.parts[partName]) {
-      return { success: false, message: `Body part '${partName}' already exists` };
-    }
+      if (state.body.parts[partName]) {
+        return { success: false, message: `Body part '${partName}' already exists` };
+      }
 
-    state.body.parts[partName] = {
-      name: partName,
-      descriptors: {},
-      states: []
-    };
+      state.body.parts[partName] = {
+        name: partName,
+        descriptors: {},
+        states: []
+      };
 
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return { success: true, message: `Created body part '${partName}'` };
+      return { success: true, message: `Created body part '${partName}'` };
+    });
   }
 
   async createBodyPartsBulk(
@@ -287,118 +335,128 @@ class BodyAndInventoryService implements BaseService {
       states?: string[];
     }>
   ): Promise<{ success: boolean; message: string; parts?: BodyPart[]; skipped?: string[] }> {
-    const state = this.getAgentState(agentId);
-    const createdParts: BodyPart[] = [];
-    const skippedParts: string[] = [];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const createdParts: BodyPart[] = [];
+      const skippedParts: string[] = [];
 
-    for (const partData of parts) {
-      if (state.body.parts[partData.name]) {
-        skippedParts.push(partData.name);
-        continue;
+      for (const partData of parts) {
+        if (state.body.parts[partData.name]) {
+          skippedParts.push(partData.name);
+          continue;
+        }
+
+        const part: BodyPart = {
+          name: partData.name,
+          descriptors: partData.descriptors || {},
+          states: partData.states || []
+        };
+
+        state.body.parts[partData.name] = part;
+        createdParts.push(part);
       }
 
-      const part: BodyPart = {
-        name: partData.name,
-        descriptors: partData.descriptors || {},
-        states: partData.states || []
+      if (createdParts.length > 0) {
+        this.saveAgentState(agentId, state);
+        await this.updateLettaMemoryBlock(agentId);
+      }
+
+      const messages: string[] = [];
+      if (createdParts.length > 0) {
+        messages.push(`Created ${createdParts.length} body part${createdParts.length === 1 ? '' : 's'}`);
+      }
+      if (skippedParts.length > 0) {
+        messages.push(`Skipped ${skippedParts.length} existing part${skippedParts.length === 1 ? '' : 's'}: ${skippedParts.join(', ')}`);
+      }
+
+      return {
+        success: createdParts.length > 0,
+        message: messages.join('. '),
+        parts: createdParts,
+        skipped: skippedParts
       };
-
-      state.body.parts[partData.name] = part;
-      createdParts.push(part);
-    }
-
-    if (createdParts.length > 0) {
-      this.saveAgentState(agentId, state);
-      await this.updateLettaMemoryBlock(agentId);
-    }
-
-    const messages: string[] = [];
-    if (createdParts.length > 0) {
-      messages.push(`Created ${createdParts.length} body part${createdParts.length === 1 ? '' : 's'}`);
-    }
-    if (skippedParts.length > 0) {
-      messages.push(`Skipped ${skippedParts.length} existing part${skippedParts.length === 1 ? '' : 's'}: ${skippedParts.join(', ')}`);
-    }
-
-    return {
-      success: createdParts.length > 0,
-      message: messages.join('. '),
-      parts: createdParts,
-      skipped: skippedParts
-    };
+    });
   }
 
   async addBodyDescriptor(agentId: AgentId, partName: string, key: string, value: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const part = state.body.parts[partName];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const part = state.body.parts[partName];
 
-    if (!part) {
-      return { success: false, message: `Body part '${partName}' not found. Create it first.` };
-    }
+      if (!part) {
+        return { success: false, message: `Body part '${partName}' not found. Create it first.` };
+      }
 
-    part.descriptors[key] = value;
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      part.descriptors[key] = value;
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return { success: true, message: `Added descriptor ${key}='${value}' to ${partName}` };
+      return { success: true, message: `Added descriptor ${key}='${value}' to ${partName}` };
+    });
   }
 
   async removeBodyDescriptor(agentId: AgentId, partName: string, key: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const part = state.body.parts[partName];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const part = state.body.parts[partName];
 
-    if (!part) {
-      return { success: false, message: `Body part '${partName}' not found` };
-    }
+      if (!part) {
+        return { success: false, message: `Body part '${partName}' not found` };
+      }
 
-    if (!part.descriptors[key]) {
-      return { success: false, message: `Descriptor '${key}' not found on ${partName}` };
-    }
+      if (!part.descriptors[key]) {
+        return { success: false, message: `Descriptor '${key}' not found on ${partName}` };
+      }
 
-    delete part.descriptors[key];
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      delete part.descriptors[key];
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return { success: true, message: `Removed descriptor '${key}' from ${partName}` };
+      return { success: true, message: `Removed descriptor '${key}' from ${partName}` };
+    });
   }
 
   async addBodyState(agentId: AgentId, partName: string, bodyState: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const part = state.body.parts[partName];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const part = state.body.parts[partName];
 
-    if (!part) {
-      return { success: false, message: `Body part '${partName}' not found. Create it first.` };
-    }
+      if (!part) {
+        return { success: false, message: `Body part '${partName}' not found. Create it first.` };
+      }
 
-    if (part.states.includes(bodyState)) {
-      return { success: false, message: `State '${bodyState}' already exists on ${partName}` };
-    }
+      if (part.states.includes(bodyState)) {
+        return { success: false, message: `State '${bodyState}' already exists on ${partName}` };
+      }
 
-    part.states.push(bodyState);
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      part.states.push(bodyState);
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return { success: true, message: `Added state '${bodyState}' to ${partName}` };
+      return { success: true, message: `Added state '${bodyState}' to ${partName}` };
+    });
   }
 
   async removeBodyState(agentId: AgentId, partName: string, bodyState: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const part = state.body.parts[partName];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const part = state.body.parts[partName];
 
-    if (!part) {
-      return { success: false, message: `Body part '${partName}' not found` };
-    }
+      if (!part) {
+        return { success: false, message: `Body part '${partName}' not found` };
+      }
 
-    const index = part.states.indexOf(bodyState);
-    if (index === -1) {
-      return { success: false, message: `State '${bodyState}' not found on ${partName}` };
-    }
+      const index = part.states.indexOf(bodyState);
+      if (index === -1) {
+        return { success: false, message: `State '${bodyState}' not found on ${partName}` };
+      }
 
-    part.states.splice(index, 1);
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      part.states.splice(index, 1);
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return { success: true, message: `Removed state '${bodyState}' from ${partName}` };
+      return { success: true, message: `Removed state '${bodyState}' from ${partName}` };
+    });
   }
 
   async getBodyPart(agentId: AgentId, partName: string): Promise<BodyPart | null> {
@@ -420,31 +478,33 @@ class BodyAndInventoryService implements BaseService {
     descriptors?: Record<string, string>,
     properties?: Record<string, any>
   ): Promise<{ success: boolean; message: string; item?: InventoryItem }> {
-    const state = this.getAgentState(agentId);
-    const config = this.getConfig(agentId);
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const config = this.getConfig(agentId);
 
-    const itemCount = Object.keys(state.inventory.items).length;
-    if (itemCount >= config.max_inventory_items) {
-      return {
-        success: false,
-        message: `Inventory full (max ${config.max_inventory_items} items)`
+      const itemCount = Object.keys(state.inventory.items).length;
+      if (itemCount >= config.max_inventory_items) {
+        return {
+          success: false,
+          message: `Inventory full (max ${config.max_inventory_items} items)`
+        };
+      }
+
+      const id = `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const item: InventoryItem = {
+        id,
+        name,
+        description,
+        descriptors: descriptors || {},
+        properties: properties || {},
+        show_in_memory: false
       };
-    }
 
-    const id = `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const item: InventoryItem = {
-      id,
-      name,
-      description,
-      descriptors: descriptors || {},
-      properties: properties || {},
-      show_in_memory: false
-    };
+      state.inventory.items[id] = item;
+      this.saveAgentState(agentId, state);
 
-    state.inventory.items[id] = item;
-    this.saveAgentState(agentId, state);
-
-    return { success: true, message: `Added item '${name}' (ID: ${id})`, item };
+      return { success: true, message: `Added item '${name}' (ID: ${id})`, item };
+    });
   }
 
   async addInventoryItemsBulk(
@@ -456,107 +516,115 @@ class BodyAndInventoryService implements BaseService {
       properties?: Record<string, any>;
     }>
   ): Promise<{ success: boolean; message: string; items?: InventoryItem[]; failed?: number }> {
-    const state = this.getAgentState(agentId);
-    const config = this.getConfig(agentId);
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const config = this.getConfig(agentId);
 
-    const currentItemCount = Object.keys(state.inventory.items).length;
-    const availableSlots = config.max_inventory_items - currentItemCount;
+      const currentItemCount = Object.keys(state.inventory.items).length;
+      const availableSlots = config.max_inventory_items - currentItemCount;
 
-    if (items.length > availableSlots) {
+      if (items.length > availableSlots) {
+        return {
+          success: false,
+          message: `Cannot add ${items.length} items. Only ${availableSlots} slots available (max ${config.max_inventory_items})`
+        };
+      }
+
+      const addedItems: InventoryItem[] = [];
+
+      for (const itemData of items) {
+        const id = `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const item: InventoryItem = {
+          id,
+          name: itemData.name,
+          description: itemData.description,
+          descriptors: itemData.descriptors || {},
+          properties: itemData.properties || {},
+          show_in_memory: false
+        };
+
+        state.inventory.items[id] = item;
+        addedItems.push(item);
+
+        // Small delay to ensure unique IDs
+        await new Promise(resolve => setTimeout(resolve, 1));
+      }
+
+      this.saveAgentState(agentId, state);
+
       return {
-        success: false,
-        message: `Cannot add ${items.length} items. Only ${availableSlots} slots available (max ${config.max_inventory_items})`
+        success: true,
+        message: `Added ${addedItems.length} item${addedItems.length === 1 ? '' : 's'} to inventory`,
+        items: addedItems,
+        failed: 0
       };
-    }
-
-    const addedItems: InventoryItem[] = [];
-
-    for (const itemData of items) {
-      const id = `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const item: InventoryItem = {
-        id,
-        name: itemData.name,
-        description: itemData.description,
-        descriptors: itemData.descriptors || {},
-        properties: itemData.properties || {},
-        show_in_memory: false
-      };
-
-      state.inventory.items[id] = item;
-      addedItems.push(item);
-
-      // Small delay to ensure unique IDs
-      await new Promise(resolve => setTimeout(resolve, 1));
-    }
-
-    this.saveAgentState(agentId, state);
-
-    return {
-      success: true,
-      message: `Added ${addedItems.length} item${addedItems.length === 1 ? '' : 's'} to inventory`,
-      items: addedItems,
-      failed: 0
-    };
+    });
   }
 
   async removeInventoryItem(agentId: AgentId, itemId: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const item = state.inventory.items[itemId];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const item = state.inventory.items[itemId];
 
-    if (!item) {
-      return { success: false, message: `Item '${itemId}' not found` };
-    }
+      if (!item) {
+        return { success: false, message: `Item '${itemId}' not found` };
+      }
 
-    const wasVisible = item.equipped_slot || item.show_in_memory;
-    delete state.inventory.items[itemId];
-    this.saveAgentState(agentId, state);
+      const wasVisible = item.equipped_slot || item.show_in_memory;
+      delete state.inventory.items[itemId];
+      this.saveAgentState(agentId, state);
 
-    if (wasVisible) {
-      await this.updateLettaMemoryBlock(agentId);
-    }
+      if (wasVisible) {
+        await this.updateLettaMemoryBlock(agentId);
+      }
 
-    return { success: true, message: `Removed item '${item.name}'` };
+      return { success: true, message: `Removed item '${item.name}'` };
+    });
   }
 
   async equipInventoryItem(agentId: AgentId, itemId: string, slot: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const item = state.inventory.items[itemId];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const item = state.inventory.items[itemId];
 
-    if (!item) {
-      return { success: false, message: `Item '${itemId}' not found` };
-    }
-
-    // Unequip any item currently in that slot
-    for (const otherItem of Object.values(state.inventory.items)) {
-      if (otherItem.equipped_slot === slot) {
-        delete otherItem.equipped_slot;
+      if (!item) {
+        return { success: false, message: `Item '${itemId}' not found` };
       }
-    }
 
-    item.equipped_slot = slot;
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      // Unequip any item currently in that slot
+      for (const otherItem of Object.values(state.inventory.items)) {
+        if (otherItem.equipped_slot === slot) {
+          delete otherItem.equipped_slot;
+        }
+      }
 
-    return { success: true, message: `Equipped '${item.name}' to ${slot}` };
+      item.equipped_slot = slot;
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
+
+      return { success: true, message: `Equipped '${item.name}' to ${slot}` };
+    });
   }
 
   async unequipInventoryItem(agentId: AgentId, itemId: string): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const item = state.inventory.items[itemId];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const item = state.inventory.items[itemId];
 
-    if (!item) {
-      return { success: false, message: `Item '${itemId}' not found` };
-    }
+      if (!item) {
+        return { success: false, message: `Item '${itemId}' not found` };
+      }
 
-    if (!item.equipped_slot) {
-      return { success: false, message: `Item '${item.name}' is not equipped` };
-    }
+      if (!item.equipped_slot) {
+        return { success: false, message: `Item '${item.name}' is not equipped` };
+      }
 
-    delete item.equipped_slot;
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      delete item.equipped_slot;
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return { success: true, message: `Unequipped '${item.name}'` };
+      return { success: true, message: `Unequipped '${item.name}'` };
+    });
   }
 
   async modifyInventoryItem(
@@ -569,43 +637,47 @@ class BodyAndInventoryService implements BaseService {
       properties?: Record<string, any>;
     }
   ): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const item = state.inventory.items[itemId];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const item = state.inventory.items[itemId];
 
-    if (!item) {
-      return { success: false, message: `Item '${itemId}' not found` };
-    }
+      if (!item) {
+        return { success: false, message: `Item '${itemId}' not found` };
+      }
 
-    if (updates.name !== undefined) item.name = updates.name;
-    if (updates.description !== undefined) item.description = updates.description;
-    if (updates.descriptors !== undefined) item.descriptors = updates.descriptors;
-    if (updates.properties !== undefined) item.properties = updates.properties;
+      if (updates.name !== undefined) item.name = updates.name;
+      if (updates.description !== undefined) item.description = updates.description;
+      if (updates.descriptors !== undefined) item.descriptors = updates.descriptors;
+      if (updates.properties !== undefined) item.properties = updates.properties;
 
-    this.saveAgentState(agentId, state);
+      this.saveAgentState(agentId, state);
 
-    if (item.equipped_slot || item.show_in_memory) {
-      await this.updateLettaMemoryBlock(agentId);
-    }
+      if (item.equipped_slot || item.show_in_memory) {
+        await this.updateLettaMemoryBlock(agentId);
+      }
 
-    return { success: true, message: `Modified item '${item.name}'` };
+      return { success: true, message: `Modified item '${item.name}'` };
+    });
   }
 
   async markItemForMemory(agentId: AgentId, itemId: string, show: boolean): Promise<{ success: boolean; message: string }> {
-    const state = this.getAgentState(agentId);
-    const item = state.inventory.items[itemId];
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const item = state.inventory.items[itemId];
 
-    if (!item) {
-      return { success: false, message: `Item '${itemId}' not found` };
-    }
+      if (!item) {
+        return { success: false, message: `Item '${itemId}' not found` };
+      }
 
-    item.show_in_memory = show;
-    this.saveAgentState(agentId, state);
-    await this.updateLettaMemoryBlock(agentId);
+      item.show_in_memory = show;
+      this.saveAgentState(agentId, state);
+      await this.updateLettaMemoryBlock(agentId);
 
-    return {
-      success: true,
-      message: show ? `Marked '${item.name}' to show in memory` : `Unmarked '${item.name}' from memory`
-    };
+      return {
+        success: true,
+        message: show ? `Marked '${item.name}' to show in memory` : `Unmarked '${item.name}' from memory`
+      };
+    });
   }
 
   async getInventoryItem(agentId: AgentId, itemId: string): Promise<InventoryItem | null> {
@@ -672,25 +744,27 @@ class BodyAndInventoryService implements BaseService {
    * Receive an item (used for creating journals or receiving items from other agents)
    */
   async receiveItem(agentId: AgentId, item: InventoryItem): Promise<{ success: boolean; message: string; item?: InventoryItem }> {
-    const state = this.getAgentState(agentId);
-    const config = this.getConfig(agentId);
+    return this.withLock(agentId, async () => {
+      const state = this.getAgentState(agentId);
+      const config = this.getConfig(agentId);
 
-    const itemCount = Object.keys(state.inventory.items).length;
-    if (itemCount >= config.max_inventory_items) {
-      return {
-        success: false,
-        message: `Inventory full (max ${config.max_inventory_items} items)`
-      };
-    }
+      const itemCount = Object.keys(state.inventory.items).length;
+      if (itemCount >= config.max_inventory_items) {
+        return {
+          success: false,
+          message: `Inventory full (max ${config.max_inventory_items} items)`
+        };
+      }
 
-    state.inventory.items[item.id] = item;
-    this.saveAgentState(agentId, state);
+      state.inventory.items[item.id] = item;
+      this.saveAgentState(agentId, state);
 
-    if (item.show_in_memory || item.equipped_slot) {
-      await this.updateLettaMemoryBlock(agentId);
-    }
+      if (item.show_in_memory || item.equipped_slot) {
+        await this.updateLettaMemoryBlock(agentId);
+      }
 
-    return { success: true, message: `Received item '${item.name}'`, item };
+      return { success: true, message: `Received item '${item.name}'`, item };
+    });
   }
 }
 

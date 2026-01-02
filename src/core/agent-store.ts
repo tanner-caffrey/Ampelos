@@ -79,6 +79,9 @@ export class AgentStore {
    * Create a new agent.
    * Note: Modules are not "attached" - all modules are available.
    * Optional moduleConfigs set per-agent config overrides.
+   *
+   * Special handling for 'letta' config: stored in agent_letta_configs table
+   * so it can be used to initialize the Letta agent.
    */
   async createAgent(options: CreateAgentOptions): Promise<AgentDefinition> {
     // Check if agent already exists
@@ -99,7 +102,19 @@ export class AgentStore {
       if (options.moduleConfigs) {
         for (const [moduleName, config] of Object.entries(options.moduleConfigs)) {
           if (config && Object.keys(config).length > 0) {
-            this.db.setModuleConfig(options.id, moduleName, config);
+            // Special handling for Letta config - store in dedicated table
+            if (moduleName === 'letta') {
+              const lettaConfig = (config as any).letta_agent_config || config;
+              this.db.setLettaConfig(options.id, {
+                model: lettaConfig.model as string | null,
+                embedding: lettaConfig.embedding as string | null,
+                enable_sleeptime: lettaConfig.enable_sleeptime !== false ? 1 : 0,
+                system_prompt_template: lettaConfig.system_prompt_template as string | null,
+                memory_blocks: JSON.stringify(lettaConfig.memory_blocks ?? {}),
+              });
+            } else {
+              this.db.setModuleConfig(options.id, moduleName, config);
+            }
           }
         }
       }

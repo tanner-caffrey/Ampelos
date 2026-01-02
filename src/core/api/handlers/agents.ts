@@ -174,6 +174,25 @@ export class AgentAPIHandler {
         moduleConfigs,
       });
 
+      // Add agent to registry cache so LettaManager can find it
+      this.serviceManager.getAgentRegistry().addToCache(agent);
+
+      // Initialize Letta agent if Letta config was provided
+      if (moduleConfigs.letta) {
+        try {
+          const agentId = createAgentId(request.id);
+          const lettaConfig = (moduleConfigs.letta as any).letta_agent_config || moduleConfigs.letta;
+          await lettaManager.initAgent(agentId, lettaConfig);
+          log.info('Created Letta agent', { agentId: request.id });
+        } catch (lettaError) {
+          log.error('Failed to create Letta agent', {
+            agentId: request.id,
+            error: lettaError instanceof Error ? lettaError.message : String(lettaError),
+          });
+          // Don't fail the whole request - agent is created, Letta can be retried
+        }
+      }
+
       const response: APIResponse<AgentDetailResponse> = {
         success: true,
         data: { agent },
@@ -216,6 +235,64 @@ export class AgentAPIHandler {
       this.sendJson(res, 200, response);
     } catch (error) {
       this.sendError(res, 500, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  /**
+   * POST /api/admin/agents/:agentId/create-letta - Create Letta agent for an existing Ampelos agent
+   *
+   * Uses the stored Letta config from agent_letta_configs table.
+   * This is the manual trigger for Letta agent creation (not done on startup).
+   */
+  async handleCreateLettaAgent(
+    req: IncomingMessage,
+    res: ServerResponse,
+    agentId: string
+  ): Promise<void> {
+    try {
+      // Check if agent exists
+      const agent = await this.store.getAgent(agentId);
+      if (!agent) {
+        this.sendError(res, 404, `Agent ${agentId} not found`);
+        return;
+      }
+
+      // Ensure agent is in registry cache (might be a newly created agent)
+      this.serviceManager.getAgentRegistry().addToCache(agent);
+
+      // Check if Letta agent already exists
+      const typedAgentId = createAgentId(agentId);
+      const existingLettaId = lettaManager.getLettaAgentId(typedAgentId);
+      if (existingLettaId) {
+        this.sendError(res, 409, `Letta agent already exists: ${existingLettaId}`);
+        return;
+      }
+
+      // Get Letta config from database
+      const lettaConfig = await this.store.getLettaConfig(agentId);
+      if (!lettaConfig) {
+        this.sendError(res, 400, 'No Letta configuration found for this agent. Configure Letta settings first.');
+        return;
+      }
+
+      // Create the Letta agent
+      await lettaManager.initAgent(typedAgentId, lettaConfig as any);
+      const newLettaId = lettaManager.getLettaAgentId(typedAgentId);
+
+      log.info('Created Letta agent via admin UI', { agentId, lettaAgentId: newLettaId });
+
+      const response: APIResponse = {
+        success: true,
+        data: { letta_agent_id: newLettaId },
+        message: `Letta agent created successfully`,
+      };
+      this.sendJson(res, 201, response);
+    } catch (error) {
+      log.error('Failed to create Letta agent', {
+        agentId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      this.sendError(res, 500, error instanceof Error ? error.message : 'Failed to create Letta agent');
     }
   }
 

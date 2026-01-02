@@ -94,6 +94,13 @@ export class ServiceManager {
   }
 
   /**
+   * Get the AgentRegistry instance (for cache management)
+   */
+  getAgentRegistry(): AgentRegistry {
+    return this.agentRegistry;
+  }
+
+  /**
    * Register a Letta agent ID mapping with the MCP server
    */
   registerLettaAgent(lettaAgentId: string, ampelosAgentId: AgentId): void {

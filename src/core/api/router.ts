@@ -180,6 +180,10 @@ export class AdminAPIRouter {
           await this.agentHandler.handleDisableAgent(req, res, agentId);
           return true;
         }
+        if (action === 'create-letta' && method === 'POST') {
+          await this.agentHandler.handleCreateLettaAgent(req, res, agentId);
+          return true;
+        }
         if (action === 'modules') {
           // /api/admin/agents/:agentId/modules
           if (method === 'GET') {
