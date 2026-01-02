@@ -68,7 +68,8 @@ function ChatPage() {
     fontSize, setFontSize
   } = usePreferences();
 
-  const { sessionDuration } = useSessionTimer();
+  // Session timer hook - kept for potential future use
+  useSessionTimer();
 
   // Image upload management
   const {
@@ -2701,10 +2702,10 @@ function ChatPage() {
           flexShrink: 0
         }}>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--theme-focused-foreground)' }}></div>
-              <span>ONLINE</span>
-            </div>
+            <div
+              style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'var(--theme-focused-foreground)' }}
+              title="Online"
+            />
             <span>
               {selectedConversation
                 ? `${selectedConversation.name} (${selectedConversation.participants.map(id => {
@@ -2721,12 +2722,10 @@ function ChatPage() {
                   textDecoration: 'none',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.375rem',
-                  padding: '0.125rem 0.5rem',
+                  justifyContent: 'center',
+                  padding: '0.25rem',
                   border: '1px solid var(--theme-border)',
                   borderRadius: '2px',
-                  fontSize: '9px',
-                  fontFamily: 'var(--font-family-mono)',
                   transition: 'border-color 0.15s, color 0.15s'
                 }}
                 onMouseEnter={(e) => {
@@ -2743,7 +2742,6 @@ function ChatPage() {
                   <circle cx="12" cy="12" r="3"></circle>
                   <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
-                CONFIG
               </Link>
             )}
             <span style={{ opacity: 0.5 }}>|</span>
@@ -2785,7 +2783,7 @@ function ChatPage() {
                     }
                   }}
                 >
-                  {selectedConversation ? 'N/A' : selectedAgent?.letta_model}
+                  {selectedConversation ? 'N/A' : selectedAgent?.letta_model?.split('/').pop()}
                 </button>
               ) : (
                 <span style={{ opacity: 0.5 }}>loading...</span>
@@ -2904,11 +2902,6 @@ function ChatPage() {
               {isSystemMode ? 'SYS' : 'USR'}
             </button>
           </div>
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-             <span>MEM: {selectedConversation ? 'N/A' : memoryBlocks.reduce((acc, b) => acc + b.value.length, 0) + ' chars'}</span>
-             <span style={{ opacity: 0.5 }}>|</span>
-             <span>T+{new Date(sessionDuration * 1000).toISOString().substr(11, 8)}</span>
-          </div>
         </div>
             </div>
           </>
@@ -3014,9 +3007,14 @@ function ChatPage() {
             ) : (
               <>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>
-                    CORE MEMORY
-                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 'bold', margin: 0 }}>
+                      CORE MEMORY
+                    </h2>
+                    <span style={{ fontSize: '9px', opacity: 0.6, fontFamily: 'var(--font-family-mono)' }}>
+                      {memoryBlocks.reduce((acc, b) => acc + b.value.length, 0).toLocaleString()} chars
+                    </span>
+                  </div>
                   <button
                     onClick={() => setIsMemoryCollapsed(!isMemoryCollapsed)}
                     style={{
