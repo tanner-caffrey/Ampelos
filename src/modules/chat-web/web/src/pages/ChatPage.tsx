@@ -89,6 +89,7 @@ function ChatPage() {
   const [showCreateConversationForm, setShowCreateConversationForm] = useState(false);
   const [isInputFocused, setIsInputFocused] = useState(false);
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
 
   // Track textarea focus for cursor styling
   useEffect(() => {
@@ -489,6 +490,10 @@ function ChatPage() {
   const handleSelectAgent = (agent: Agent) => {
     setSelectedAgent(agent);
     setSelectedConversation(null); // Clear conversation selection when selecting agent
+    // Auto-collapse sidebar on mobile
+    if (window.innerWidth <= 768) {
+      setIsAgentSidebarCollapsed(true);
+    }
   };
 
   const handleSelectConversation = (conversation: Conversation) => {
@@ -498,6 +503,10 @@ function ChatPage() {
     } else {
       setSelectedConversation(conversation);
       setSelectedAgent(null); // Clear agent selection when selecting conversation
+      // Auto-collapse sidebar on mobile
+      if (window.innerWidth <= 768) {
+        setIsAgentSidebarCollapsed(true);
+      }
     }
   };
 
@@ -886,6 +895,25 @@ function ChatPage() {
     }}>
       {/* Matrix Background Effect */}
       <MatrixBackground enabled={matrixBg} />
+
+      {/* Mobile backdrop - shown when either sidebar is open on mobile */}
+      {(!isAgentSidebarCollapsed || !isMemoryCollapsed) && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => {
+            setIsAgentSidebarCollapsed(true);
+            setIsMemoryCollapsed(true);
+          }}
+          style={{
+            display: 'none', // Hidden by default, shown via CSS media query on mobile
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 99
+          }}
+        />
+      )}
+
       {/* Left Sidebar - Agents and Conversations */}
       <div style={{ display: 'flex', flexShrink: 0 }}>
         <div className="chat-left-sidebar" style={{
@@ -1219,10 +1247,56 @@ function ChatPage() {
               borderRight: '2px solid var(--theme-border)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)'
             }}>
+              {/* Sidebar toggles - always visible for mobile access */}
+              <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                <button
+                  onClick={() => setIsAgentSidebarCollapsed(prev => !prev)}
+                  style={{
+                    padding: '0.125rem 0.375rem',
+                    border: '1px solid var(--theme-border)',
+                    background: isAgentSidebarCollapsed ? 'var(--theme-background-input)' : 'var(--theme-focused-foreground)',
+                    color: isAgentSidebarCollapsed ? 'var(--theme-text)' : 'var(--theme-background)',
+                    cursor: 'pointer',
+                    fontSize: '9px',
+                    height: '20px',
+                    minWidth: '24px',
+                    fontFamily: 'var(--font-family-mono)',
+                    borderRadius: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title={isAgentSidebarCollapsed ? 'Show agents' : 'Hide agents'}
+                >
+                  ☰
+                </button>
+                <button
+                  onClick={() => setIsMemoryCollapsed(prev => !prev)}
+                  style={{
+                    padding: '0.125rem 0.375rem',
+                    border: '1px solid var(--theme-border)',
+                    background: isMemoryCollapsed ? 'var(--theme-background-input)' : 'var(--theme-focused-foreground)',
+                    color: isMemoryCollapsed ? 'var(--theme-text)' : 'var(--theme-background)',
+                    cursor: 'pointer',
+                    fontSize: '9px',
+                    height: '20px',
+                    minWidth: '24px',
+                    fontFamily: 'var(--font-family-mono)',
+                    borderRadius: '0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                  title={isMemoryCollapsed ? 'Show memory' : 'Hide memory'}
+                >
+                  ◫
+                </button>
+              </div>
+
               {/* Terminal-style title */}
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
                 gap: '0.5rem',
                 opacity: 0.7,
                 letterSpacing: '0.1em'
@@ -1311,146 +1385,200 @@ function ChatPage() {
 
               {/* Control Panel */}
               <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                {/* Font Size Controls */}
-                <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--theme-border)', background: 'var(--theme-background-input)', borderRadius: '0' }}>
+                {/* Settings Menu */}
+                <div style={{ position: 'relative' }}>
                   <button
-                    onClick={() => {
-                      const sizes = ['12px', '14px', '16px'];
-                      const currentIndex = sizes.indexOf(fontSize);
-                      if (currentIndex > 0) setFontSize(sizes[currentIndex - 1]);
-                    }}
-                    style={{ 
-                      padding: '0.125rem 0.375rem', 
-                      border: 'none', 
-                      borderRight: '1px solid var(--theme-border)', 
-                      background: 'transparent', 
-                      color: 'var(--theme-text)', 
-                      cursor: 'pointer', 
-                      opacity: fontSize === '12px' ? 0.5 : 1,
+                    onClick={() => setSettingsMenuOpen(!settingsMenuOpen)}
+                    style={{
+                      padding: '0.125rem 0.375rem',
+                      border: '1px solid var(--theme-border)',
+                      background: settingsMenuOpen ? 'var(--theme-focused-foreground)' : 'var(--theme-background-input)',
+                      color: settingsMenuOpen ? 'var(--theme-background)' : 'var(--theme-text)',
+                      cursor: 'pointer',
                       fontSize: '9px',
+                      height: '20px',
+                      minWidth: '24px',
                       fontFamily: 'var(--font-family-mono)',
-                      lineHeight: '1'
+                      borderRadius: '0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}
-                    disabled={fontSize === '12px'}
-                    title="Decrease font size"
-                  >-</button>
-                  <span style={{ padding: '0.125rem 0.375rem', fontSize: '9px', minWidth: '1.5ch', textAlign: 'center', opacity: 0.7 }}>A</span>
-                  <button
-                    onClick={() => {
-                      const sizes = ['12px', '14px', '16px'];
-                      const currentIndex = sizes.indexOf(fontSize);
-                      if (currentIndex < sizes.length - 1) setFontSize(sizes[currentIndex + 1]);
-                    }}
-                    style={{ 
-                      padding: '0.125rem 0.375rem', 
-                      border: 'none', 
-                      borderLeft: '1px solid var(--theme-border)', 
-                      background: 'transparent', 
-                      color: 'var(--theme-text)', 
-                      cursor: 'pointer', 
-                      opacity: fontSize === '16px' ? 0.5 : 1,
-                      fontSize: '9px',
-                      fontFamily: 'var(--font-family-mono)',
-                      lineHeight: '1'
-                    }}
-                    disabled={fontSize === '16px'}
-                    title="Increase font size"
-                  >+</button>
+                    title="Settings"
+                  >
+                    ⚙
+                  </button>
+
+                  {/* Settings Dropdown */}
+                  {settingsMenuOpen && (
+                    <>
+                      {/* Backdrop to close menu */}
+                      <div
+                        onClick={() => setSettingsMenuOpen(false)}
+                        style={{
+                          position: 'fixed',
+                          inset: 0,
+                          zIndex: 199
+                        }}
+                      />
+                      <div
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          right: 0,
+                          marginTop: '4px',
+                          background: 'var(--theme-background)',
+                          border: '1px solid var(--theme-border)',
+                          padding: '0.5rem',
+                          zIndex: 200,
+                          minWidth: '180px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.5rem',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                        }}
+                      >
+                        {/* Font Size */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase' }}>Font Size</span>
+                          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--theme-border)', background: 'var(--theme-background-input)' }}>
+                            <button
+                              onClick={() => {
+                                const sizes = ['12px', '14px', '16px'];
+                                const currentIndex = sizes.indexOf(fontSize);
+                                if (currentIndex > 0) setFontSize(sizes[currentIndex - 1]);
+                              }}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                border: 'none',
+                                borderRight: '1px solid var(--theme-border)',
+                                background: 'transparent',
+                                color: 'var(--theme-text)',
+                                cursor: 'pointer',
+                                opacity: fontSize === '12px' ? 0.5 : 1,
+                                fontSize: '10px',
+                                fontFamily: 'var(--font-family-mono)'
+                              }}
+                              disabled={fontSize === '12px'}
+                            >-</button>
+                            <span style={{ padding: '0.25rem 0.5rem', fontSize: '10px', opacity: 0.7 }}>A</span>
+                            <button
+                              onClick={() => {
+                                const sizes = ['12px', '14px', '16px'];
+                                const currentIndex = sizes.indexOf(fontSize);
+                                if (currentIndex < sizes.length - 1) setFontSize(sizes[currentIndex + 1]);
+                              }}
+                              style={{
+                                padding: '0.25rem 0.5rem',
+                                border: 'none',
+                                borderLeft: '1px solid var(--theme-border)',
+                                background: 'transparent',
+                                color: 'var(--theme-text)',
+                                cursor: 'pointer',
+                                opacity: fontSize === '16px' ? 0.5 : 1,
+                                fontSize: '10px',
+                                fontFamily: 'var(--font-family-mono)'
+                              }}
+                              disabled={fontSize === '16px'}
+                            >+</button>
+                          </div>
+                        </div>
+
+                        {/* Color Tint */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase' }}>Color</span>
+                          <select
+                            value={tint}
+                            onChange={(e) => setTint(e.target.value)}
+                            style={{
+                              padding: '0.25rem 0.5rem',
+                              border: '1px solid var(--theme-border)',
+                              background: 'var(--theme-background-input)',
+                              color: 'var(--theme-text)',
+                              cursor: 'pointer',
+                              fontSize: '10px',
+                              fontFamily: 'var(--font-family-mono)',
+                              textTransform: 'uppercase'
+                            }}
+                          >
+                            <option value="green">Green</option>
+                            <option value="blue">Blue</option>
+                            <option value="red">Red</option>
+                            <option value="yellow">Yellow</option>
+                            <option value="purple">Purple</option>
+                            <option value="orange">Orange</option>
+                            <option value="pink">Pink</option>
+                            <option value="amber">Amber</option>
+                          </select>
+                        </div>
+
+                        {/* Theme Toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                          <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase' }}>Theme</span>
+                          <button
+                            onClick={toggleTheme}
+                            style={{
+                              padding: '0.25rem 0.75rem',
+                              border: '1px solid var(--theme-border)',
+                              background: 'var(--theme-background-input)',
+                              color: 'var(--theme-text)',
+                              cursor: 'pointer',
+                              fontSize: '10px',
+                              fontFamily: 'var(--font-family-mono)',
+                              textTransform: 'uppercase',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.25rem'
+                            }}
+                          >
+                            {theme === 'dark' ? '☀ Light' : '🌙 Dark'}
+                          </button>
+                        </div>
+
+                        {/* Visual Effects */}
+                        <div style={{ borderTop: '1px solid var(--theme-border)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                          <span style={{ fontSize: '9px', opacity: 0.5, textTransform: 'uppercase', display: 'block', marginBottom: '0.5rem' }}>Effects</span>
+                          <div style={{ display: 'flex', gap: '0.25rem' }}>
+                            <button
+                              onClick={toggleCrtMode}
+                              style={{
+                                flex: 1,
+                                padding: '0.25rem 0.5rem',
+                                border: '1px solid var(--theme-border)',
+                                background: crtMode ? 'var(--theme-focused-foreground)' : 'var(--theme-background-input)',
+                                color: crtMode ? 'var(--theme-background)' : 'var(--theme-text)',
+                                cursor: 'pointer',
+                                fontSize: '10px',
+                                fontFamily: 'var(--font-family-mono)',
+                                textTransform: 'uppercase',
+                                fontWeight: crtMode ? 'bold' : 'normal'
+                              }}
+                            >
+                              CRT
+                            </button>
+                            <button
+                              onClick={toggleMatrixBg}
+                              style={{
+                                flex: 1,
+                                padding: '0.25rem 0.5rem',
+                                border: '1px solid var(--theme-border)',
+                                background: matrixBg ? 'var(--theme-focused-foreground)' : 'var(--theme-background-input)',
+                                color: matrixBg ? 'var(--theme-background)' : 'var(--theme-text)',
+                                cursor: 'pointer',
+                                fontSize: '10px',
+                                fontFamily: 'var(--font-family-mono)',
+                                textTransform: 'uppercase',
+                                fontWeight: matrixBg ? 'bold' : 'normal'
+                              }}
+                            >
+                              MATRIX
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-
-                <span style={{ opacity: 0.3, margin: '0 0.125rem' }}>│</span>
-
-                <select
-                  value={tint}
-                  onChange={(e) => setTint(e.target.value)}
-                  style={{
-                    padding: '0.125rem 0.375rem',
-                    border: '1px solid var(--theme-border)',
-                    background: 'var(--theme-background-input)',
-                    color: 'var(--theme-text)',
-                    cursor: 'pointer',
-                    fontSize: '9px',
-                    height: '20px',
-                    fontFamily: 'var(--font-family-mono)',
-                    textTransform: 'uppercase',
-                    borderRadius: '0'
-                  }}
-                  title="Select color tint"
-                >
-                  <option value="green">Green</option>
-                  <option value="blue">Blue</option>
-                  <option value="red">Red</option>
-                  <option value="yellow">Yellow</option>
-                  <option value="purple">Purple</option>
-                  <option value="orange">Orange</option>
-                  <option value="pink">Pink</option>
-                  <option value="amber">Amber</option>
-                </select>
-                
-                <span style={{ opacity: 0.3, margin: '0 0.125rem' }}>│</span>
-                
-                <button
-                  onClick={toggleTheme}
-                  style={{
-                    padding: '0.125rem 0.375rem',
-                    border: '1px solid var(--theme-border)',
-                    background: 'var(--theme-background-input)',
-                    color: 'var(--theme-text)',
-                    cursor: 'pointer',
-                    fontSize: '9px',
-                    height: '20px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    fontFamily: 'var(--font-family-mono)',
-                    textTransform: 'uppercase',
-                    borderRadius: '0'
-                  }}
-                  title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-                >
-                  {theme === 'dark' ? '☀' : '🌙'}
-                </button>
-
-                <span style={{ opacity: 0.3, margin: '0 0.125rem' }}>│</span>
-
-                <button
-                  onClick={toggleCrtMode}
-                  style={{
-                    padding: '0.125rem 0.375rem',
-                    border: '1px solid var(--theme-border)',
-                    background: crtMode ? 'var(--theme-focused-foreground)' : 'var(--theme-background-input)',
-                    color: crtMode ? 'var(--theme-background)' : 'var(--theme-text)',
-                    cursor: 'pointer',
-                    fontSize: '9px',
-                    height: '20px',
-                    fontFamily: 'var(--font-family-mono)',
-                    textTransform: 'uppercase',
-                    borderRadius: '0',
-                    fontWeight: crtMode ? 'bold' : 'normal'
-                  }}
-                  title="Toggle CRT scanline effect"
-                >
-                  CRT
-                </button>
-
-                <button
-                  onClick={toggleMatrixBg}
-                  style={{
-                    padding: '0.125rem 0.375rem',
-                    border: '1px solid var(--theme-border)',
-                    background: matrixBg ? 'var(--theme-focused-foreground)' : 'var(--theme-background-input)',
-                    color: matrixBg ? 'var(--theme-background)' : 'var(--theme-text)',
-                    cursor: 'pointer',
-                    fontSize: '9px',
-                    height: '20px',
-                    fontFamily: 'var(--font-family-mono)',
-                    textTransform: 'uppercase',
-                    borderRadius: '0',
-                    fontWeight: matrixBg ? 'bold' : 'normal'
-                  }}
-                  title="Toggle Matrix background effect"
-                >
-                  MATRIX
-                </button>
 
                 <span style={{ opacity: 0.3, margin: '0 0.125rem' }}>│</span>
 
@@ -3184,147 +3312,140 @@ function ChatPage() {
           text-shadow: 0 0 2px currentColor;
         }
         @media (max-width: 768px) {
+          /* Mobile layout - sidebars as overlays */
           .chat-main-layout {
-            flex-direction: column !important;
+            flex-direction: row !important;
             height: 100% !important;
             overflow: hidden !important;
           }
+
+          /* Show backdrop on mobile when sidebar is open */
+          .sidebar-backdrop {
+            display: block !important;
+          }
+
+          /* Left sidebar - overlay from left */
           .chat-left-sidebar {
-            width: 100% !important;
-            max-height: 200px !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            height: 100% !important;
+            width: 280px !important;
+            max-width: 85vw !important;
+            z-index: 100 !important;
+            background: var(--theme-background) !important;
+            border-right: 1px solid var(--theme-border) !important;
             overflow-y: auto !important;
-            border-right: none !important;
-            border-bottom: 1px solid var(--theme-border) !important;
-            flex-shrink: 0 !important;
+            padding: 1rem !important;
+            padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+            padding-left: calc(1rem + env(safe-area-inset-left, 0px)) !important;
+            transition: transform 0.2s ease, width 0s !important;
+            flex-direction: column !important;
           }
+
+          /* Left sidebar collapsed - slide off-screen */
+          .chat-left-sidebar[style*="width: 3ch"],
+          .chat-left-sidebar[style*="width:3ch"] {
+            transform: translateX(-100%) !important;
+            width: 280px !important;
+          }
+
+          /* Right sidebar - overlay from right */
           .chat-right-sidebar {
-            width: 100% !important;
-            max-height: 300px !important;
+            position: fixed !important;
+            right: 0 !important;
+            top: 0 !important;
+            height: 100% !important;
+            width: 300px !important;
+            max-width: 85vw !important;
+            z-index: 100 !important;
+            background: var(--theme-background) !important;
+            border-left: 1px solid var(--theme-border) !important;
             overflow-y: auto !important;
-            border-left: none !important;
-            border-top: 1px solid var(--theme-border) !important;
-            flex-shrink: 0 !important;
+            padding: 1rem !important;
+            padding-top: calc(1rem + env(safe-area-inset-top, 0px)) !important;
+            padding-right: calc(1rem + env(safe-area-inset-right, 0px)) !important;
+            display: block !important;
+            transition: transform 0.2s ease, width 0s !important;
           }
+
+          /* Right sidebar collapsed - slide off-screen */
+          .chat-right-sidebar[style*="width: 3ch"],
+          .chat-right-sidebar[style*="width:3ch"] {
+            transform: translateX(100%) !important;
+            width: 300px !important;
+          }
+
+          /* Hide resize handles on mobile */
+          .chat-resize-handle {
+            display: none !important;
+          }
+
+          /* Main content area takes full width */
           .chat-content-area {
             flex: 1 !important;
             min-height: 0 !important;
             overflow: hidden !important;
+            width: 100% !important;
           }
-          
+
           /* Multi-agent mobile layout */
           .multi-agent-view {
             flex-direction: column !important;
             height: 100% !important;
             overflow: hidden !important;
           }
-          
+
           .multi-agent-conversation-list {
-            width: 100% !important;
-            max-height: 40vh !important;
+            position: fixed !important;
+            left: 0 !important;
+            top: 0 !important;
+            height: 100% !important;
+            width: 280px !important;
+            max-width: 85vw !important;
+            z-index: 100 !important;
+            background: var(--theme-background) !important;
             overflow-y: auto !important;
-            border-right: none !important;
-            border-bottom: 1px solid var(--theme-border) !important;
-            flex-shrink: 0 !important;
           }
-          
+
           .multi-agent-chat-area {
             flex: 1 !important;
             min-height: 0 !important;
             overflow: hidden !important;
           }
-          
+
           .multi-agent-resize-handle {
             display: none !important;
           }
-          
-          /* Hide conversation list on mobile when conversation is selected */
-          .multi-agent-view .multi-agent-chat-area ~ .multi-agent-conversation-list,
-          .multi-agent-view:has(.multi-agent-chat-area) .multi-agent-conversation-list {
-            display: none !important;
-          }
-          
-          /* Show back button prominently on mobile */
-          .multi-agent-chat .chat-header button[title="Back to conversations"] {
-            font-size: 1rem !important;
-            padding: 0.75rem 1rem !important;
-            min-width: auto !important;
-          }
-          
-          /* Ensure proper scrolling on mobile */
-          .multi-agent-view {
-            height: 100% !important;
-            max-height: 100% !important;
-          }
-          
-          .conversation-list {
-            height: 100% !important;
-            max-height: 100% !important;
-          }
-          
-          /* Left sidebar (agents) - horizontal scroll on mobile */
-          .chat-main-layout > div:first-child {
-            width: 100% !important;
-            max-height: 120px !important;
-            overflow-x: auto !important;
-            overflow-y: hidden !important;
-            border-right: none !important;
-            border-bottom: 1px solid var(--theme-border) !important;
-            flex-shrink: 0 !important;
-            padding: 0.75rem !important;
-            display: flex !important;
-            flex-direction: row !important;
-            gap: 0.5rem !important;
-            align-items: flex-start !important;
-          }
-          
-          .chat-main-layout > div:first-child h2 {
-            display: none !important;
-          }
-          
-          .chat-main-layout > div:first-child > div {
-            min-width: 80px !important;
-            padding: 0.5rem !important;
-            margin-bottom: 0 !important;
-            font-size: 11px !important;
-            white-space: nowrap !important;
-          }
-          
-          /* Main content area */
-          .chat-main-layout > div:nth-child(2) {
-            flex: 1 !important;
-            min-height: 0 !important;
-            overflow: hidden !important;
-            display: flex !important;
-            flex-direction: column !important;
-          }
-          
-          /* Right sidebar (memory) - hide on mobile */
-          .chat-right-sidebar,
-          .chat-resize-handle {
-            display: none !important;
-          }
-          
+
           /* Messages container - ensure scrolling works */
           .messages-container,
-          [class*="messages-container"],
-          [ref*="messagesContainer"] {
+          [class*="messages-container"] {
             -webkit-overflow-scrolling: touch !important;
             overflow-y: auto !important;
             overflow-x: hidden !important;
           }
-          
+
           /* Input forms - ensure they don't get cut off */
           .chat-input-form,
           [class*="chat-input-form"] {
             flex-shrink: 0 !important;
             padding: 0.75rem !important;
+            padding-bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px)) !important;
           }
-          
-          /* Headers - make them more compact */
+
+          /* Headers - make toggle buttons larger for touch */
           .chat-header,
           [class*="chat-header"] {
-            padding: 0.75rem !important;
+            padding: 0.5rem !important;
             flex-wrap: wrap !important;
+            gap: 0.25rem !important;
+          }
+
+          /* Larger touch targets for toggle buttons */
+          .chat-header button {
+            min-height: 36px !important;
+            min-width: 36px !important;
           }
         }
         
