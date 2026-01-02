@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
+// Bump this to force PWA cache invalidation for all users
+const PWA_CACHE_VERSION = '1.0.1';
+
 export default defineConfig({
   plugins: [
     react(),
@@ -43,6 +46,10 @@ export default defineConfig({
         skipWaiting: true,
         clientsClaim: true,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+        // Version marker - changing PWA_CACHE_VERSION forces full cache refresh
+        additionalManifestEntries: [
+          { url: 'version.txt', revision: PWA_CACHE_VERSION }
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https?:\/\/localhost:\d+\/api\/.*/i,
