@@ -1,7 +1,7 @@
 {
   "name": "chat-web",
-  "version": "1.0.0",
-  "provides": ["service"],
+  "version": "1.2.0",
+  "provides": ["service", "tool"],
   "dependencies": [],
   "config_schema": {
     "type": "object",
@@ -23,6 +23,6 @@
       }
     }
   },
-  "advertise": false,
+  "advertise": true,
   "description": "Web-based chat interface for interacting with Ampelos agents"
 }

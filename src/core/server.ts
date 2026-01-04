@@ -208,11 +208,35 @@ export class MCPServer {
 
       const contentType = contentTypes[ext] || 'application/octet-stream';
 
-      chatWebLog.debug(`Serving ${filePath} as ${contentType}`);
-      res.writeHead(200, {
+      // Determine cache control:
+      // - HTML files: no-store (always fetch fresh)
+      // - Service worker: no-store (browsers must always check for updates)
+      // - Manifest: no-store (PWA manifest should be fresh)
+      // - Other assets: long cache (they have content hashes in filenames)
+      const isServiceWorker = filePath.includes('sw.js') || filePath.includes('sw.mjs');
+      const isManifest = filePath.includes('manifest');
+      const shouldNotCache = ext === '.html' || isServiceWorker || isManifest;
+
+      // Build response headers
+      const headers: Record<string, string> = {
         'Content-Type': contentType,
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=31536000'
-      });
+      };
+
+      if (shouldNotCache) {
+        // Aggressive no-cache for critical PWA files
+        // - no-store: Don't store in any cache (browser or CDN)
+        // - no-cache: Always revalidate with origin
+        // - must-revalidate: Don't serve stale content
+        // - CDN-Cache-Control: Cloudflare-specific directive to bypass edge cache
+        headers['Cache-Control'] = 'no-store, no-cache, must-revalidate';
+        headers['CDN-Cache-Control'] = 'no-store';
+        headers['Cloudflare-CDN-Cache-Control'] = 'no-store';
+      } else {
+        headers['Cache-Control'] = 'public, max-age=31536000';
+      }
+
+      chatWebLog.debug(`Serving ${filePath} as ${contentType}`);
+      res.writeHead(200, headers);
       res.end(content);
       return true;
     } catch (error) {
@@ -458,6 +482,7 @@ export class MCPServer {
       // Find the tool in ALL loaded modules (modules are available to all agents)
       let toolHandler: ((params: Record<string, unknown>, context: ToolContext) => Promise<ToolResult>) | null = null;
       let toolModule: LoadedModule | null = null;
+      let isCoreTool = false;
 
       for (const [_moduleName, module] of this.modules) {
         if (!module || !module.loaded || !module.tools) continue;
@@ -467,6 +492,15 @@ export class MCPServer {
           toolHandler = tool.handler;
           toolModule = module;
           break;
+        }
+      }
+
+      // If not found in modules, check core Letta tools (non-global ones)
+      if (!toolHandler) {
+        const coreTool = this.lettaCoreTools.find(t => t.name === name && !t.global);
+        if (coreTool) {
+          toolHandler = coreTool.handler;
+          isCoreTool = true;
         }
       }
 
@@ -482,12 +516,13 @@ export class MCPServer {
         };
       }
 
-      // Create tool context
-      const context = this.createToolContext(agentId, toolModule!.manifest.name);
+      // Create tool context (use 'letta' as module name for core tools)
+      const moduleName = isCoreTool ? 'letta' : toolModule!.manifest.name;
+      const context = this.createToolContext(agentId, moduleName);
 
       try {
-        // Lazy-initialize agent for this module's service if needed
-        if (toolModule!.manifest.provides.includes('service')) {
+        // Lazy-initialize agent for this module's service if needed (skip for core tools)
+        if (!isCoreTool && toolModule!.manifest.provides.includes('service')) {
           const serviceName = toolModule!.manifest.name;
           try {
             await this.serviceManager.ensureAgentInitialized(agentId, serviceName);
@@ -727,7 +762,12 @@ export class MCPServer {
     // Chat-web API endpoints bypass auth (served from same origin)
     // These are user-facing endpoints, not MCP tool endpoints
     const url = req.url?.split('?')[0]; // Remove query string
-    if (url?.startsWith('/api/agents') || url?.startsWith('/api/admin')) {
+    if (
+      url?.startsWith('/api/agents') ||
+      url?.startsWith('/api/admin') ||
+      url?.startsWith('/api/conversations') ||
+      url?.startsWith('/api/push')
+    ) {
       return true;
     }
 

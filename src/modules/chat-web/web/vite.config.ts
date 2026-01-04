@@ -4,12 +4,16 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 // Bump this to force PWA cache invalidation for all users
-const PWA_CACHE_VERSION = '1.0.1';
+const PWA_CACHE_VERSION = '1.2.0';
 
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // Use injectManifest to use our custom service worker with push support
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/*.png'],
       manifest: {
@@ -41,32 +45,16 @@ export default defineConfig({
           }
         ]
       },
-      workbox: {
-        // Force immediate activation of new service worker
-        skipWaiting: true,
-        clientsClaim: true,
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         // Version marker - changing PWA_CACHE_VERSION forces full cache refresh
         additionalManifestEntries: [
           { url: 'version.txt', revision: PWA_CACHE_VERSION }
         ],
-        runtimeCaching: [
-          {
-            urlPattern: /^https?:\/\/localhost:\d+\/api\/.*/i,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 60 * 60 // 1 hour
-              },
-              networkTimeoutSeconds: 10
-            }
-          }
-        ]
       },
       devOptions: {
-        enabled: true
+        enabled: true,
+        type: 'module',
       }
     })
   ],

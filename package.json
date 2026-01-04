@@ -44,6 +44,7 @@
     "dotenv": "^17.2.3",
     "lowdb": "^7.0.1",
     "rss-parser": "^3.13.0",
+    "web-push": "^3.6.7",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "zod": "^3.23.8"
@@ -51,6 +52,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.19.25",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.0.15",
     "concurrently": "^9.2.1",
     "tsx": "^4.7.0",

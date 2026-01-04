@@ -19,6 +19,7 @@ import { usePreferences } from '../hooks/usePreferences';
 import { useSessionTimer } from '../hooks/useSessionTimer';
 import { useDualSidebarResize } from '../hooks/useSidebarResize';
 import { useImageUpload } from '../hooks/useImageUpload';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 import { ImageLightbox } from '../components/ImageLightbox';
 import { CreateConversationForm } from '../components/CreateConversationForm';
 import { MatrixBackground } from '../components/MatrixBackground';
@@ -84,6 +85,15 @@ function ChatPage() {
     clearImages,
     setImages
   } = useImageUpload({ enabled: !loading && !!selectedAgent });
+
+  // Push notifications
+  const {
+    isSupported: pushSupported,
+    isServerEnabled: pushServerEnabled,
+    isSubscribed: pushSubscribed,
+    isLoading: pushLoading,
+    toggle: togglePush
+  } = usePushNotifications();
 
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -1576,6 +1586,33 @@ function ChatPage() {
                             </button>
                           </div>
                         </div>
+
+                        {/* Push Notifications */}
+                        {pushSupported && pushServerEnabled && (
+                          <div style={{ borderTop: '1px solid var(--theme-border)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                              <span style={{ fontSize: '9px', opacity: 0.7, textTransform: 'uppercase' }}>Notifications</span>
+                              <button
+                                onClick={togglePush}
+                                disabled={pushLoading}
+                                style={{
+                                  padding: '0.25rem 0.75rem',
+                                  border: '1px solid var(--theme-border)',
+                                  background: pushSubscribed ? 'var(--theme-focused-foreground)' : 'var(--theme-background-input)',
+                                  color: pushSubscribed ? 'var(--theme-background)' : 'var(--theme-text)',
+                                  cursor: pushLoading ? 'wait' : 'pointer',
+                                  fontSize: '10px',
+                                  fontFamily: 'var(--font-family-mono)',
+                                  textTransform: 'uppercase',
+                                  opacity: pushLoading ? 0.5 : 1,
+                                  fontWeight: pushSubscribed ? 'bold' : 'normal'
+                                }}
+                              >
+                                {pushLoading ? '...' : pushSubscribed ? '🔔 ON' : '🔕 OFF'}
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </>
                   )}

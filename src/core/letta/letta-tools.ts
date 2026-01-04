@@ -308,6 +308,105 @@ Created: ${info.created_at}
 };
 
 /**
+ * Delete archival memory passage by content
+ * Uses client.agents.passages.list() and client.agents.passages.delete()
+ */
+const letta_delete_archival_memory: ToolDefinition = {
+  name: 'letta_delete_archival_memory',
+  description: 'Delete a passage from the agent\'s archival memory by searching for matching content. Searches for passages containing the specified text and deletes the best match.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      content: {
+        type: 'string',
+        description: 'The content text to search for. The passage with the highest relevance match will be deleted.'
+      },
+      delete_all_matches: {
+        type: 'boolean',
+        description: 'If true, delete ALL passages matching the content. If false (default), only delete the top match.'
+      }
+    },
+    required: ['content']
+  },
+  handler: async (params, context): Promise<ToolResult> => {
+    try {
+      const lettaManager = (context as any).getLettaManager?.() as LettaManager;
+      if (!lettaManager) {
+        return {
+          content: [{ type: 'text', text: 'Error: Letta manager not available' }],
+          isError: true
+        };
+      }
+
+      const content = params.content as string;
+      const deleteAll = params.delete_all_matches === true;
+
+      // Get the raw SDK client for this agent
+      const sdk = lettaManager.getSdkForAgent(context.agentId);
+      if (!sdk) {
+        return {
+          content: [{ type: 'text', text: 'Error: Could not get Letta SDK for agent' }],
+          isError: true
+        };
+      }
+
+      // Get the Letta agent ID from the mapping
+      const lettaAgentId = lettaManager.getLettaAgentId(context.agentId);
+      if (!lettaAgentId) {
+        return {
+          content: [{ type: 'text', text: 'Error: Agent not initialized with Letta' }],
+          isError: true
+        };
+      }
+
+      // Search for matching passages using SDK
+      // client.agents.passages.list(agentId, { query_text, limit })
+      const results = await (sdk.agents as any).passages.list(lettaAgentId, {
+        query_text: content,
+        limit: deleteAll ? 100 : 1
+      });
+
+      // Handle response - may be array directly or paginated
+      const passages = Array.isArray(results) ? results : (results?.items || []);
+      if (passages.length === 0) {
+        return {
+          content: [{ type: 'text', text: `No archival memory passages found matching: "${content}"` }],
+          isError: false
+        };
+      }
+
+      // Delete the matching passage(s)
+      const passagesToDelete = deleteAll ? passages : [passages[0]];
+      let deleted = 0;
+
+      for (const passage of passagesToDelete) {
+        // client.agents.passages.delete(agentId, passageId)
+        await (sdk.agents as any).passages.delete(lettaAgentId, passage.id);
+        deleted++;
+      }
+
+      const summary = deleted === 1
+        ? `Successfully deleted 1 archival memory passage matching: "${content}"`
+        : `Successfully deleted ${deleted} archival memory passages matching: "${content}"`;
+
+      return {
+        content: [{ type: 'text', text: summary }]
+      };
+    } catch (error) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error instanceof Error ? error.message : String(error)}`
+          }
+        ],
+        isError: true
+      };
+    }
+  }
+};
+
+/**
  * Register a Letta agent with Ampelos
  *
  * This is a GLOBAL tool that can be called without an existing agent context.
@@ -549,6 +648,7 @@ export function getLettaCoreTools(): ToolDefinition[] {
     letta_update_memory,
     letta_get_messages,
     letta_get_agent_info,
+    letta_delete_archival_memory,
     ampelos_register_agent,
   ];
 }
@@ -560,5 +660,6 @@ export const tools = {
   letta_update_memory,
   letta_get_messages,
   letta_get_agent_info,
+  letta_delete_archival_memory,
   ampelos_register_agent,
 };

@@ -15,6 +15,7 @@ import { MessagesAPIHandler } from './messages.js';
 import { MemoryAPIHandler } from './memory.js';
 import { ConversationsAPIHandler } from './conversations.js';
 import { SchedulesAPIHandler } from './schedules.js';
+import { PushAPIHandler } from './push.js';
 
 export class ChatWebAPIRouter {
   private agentsHandler: AgentsAPIHandler;
@@ -22,6 +23,7 @@ export class ChatWebAPIRouter {
   private memoryHandler: MemoryAPIHandler;
   private conversationsHandler: ConversationsAPIHandler;
   private schedulesHandler: SchedulesAPIHandler;
+  private pushHandler: PushAPIHandler;
 
   constructor(
     agentRegistry: AgentRegistry,
@@ -32,6 +34,7 @@ export class ChatWebAPIRouter {
     this.memoryHandler = new MemoryAPIHandler(agentRegistry, serviceManager);
     this.conversationsHandler = new ConversationsAPIHandler(agentRegistry, serviceManager);
     this.schedulesHandler = new SchedulesAPIHandler(agentRegistry, serviceManager);
+    this.pushHandler = new PushAPIHandler(serviceManager);
   }
 
   /**
@@ -185,6 +188,43 @@ export class ChatWebAPIRouter {
           // DELETE /api/agents/:agentId/schedules/:scheduleId - Delete specific schedule
           if (method === 'DELETE') {
             await this.schedulesHandler.handleDeleteSchedule(req, res, agentId, scheduleId);
+            return true;
+          }
+        }
+      }
+    } else if (pathParts[1] === 'push') {
+      // Push notification endpoints
+      if (pathParts.length === 3) {
+        const resource = pathParts[2];
+
+        if (resource === 'vapid-key') {
+          // GET /api/push/vapid-key
+          if (method === 'GET') {
+            await this.pushHandler.handleGetVapidKey(req, res);
+            return true;
+          }
+        } else if (resource === 'status') {
+          // GET /api/push/status
+          if (method === 'GET') {
+            await this.pushHandler.handleGetStatus(req, res);
+            return true;
+          }
+        } else if (resource === 'subscribe') {
+          // POST /api/push/subscribe
+          if (method === 'POST') {
+            await this.pushHandler.handleSubscribe(req, res, body);
+            return true;
+          }
+        } else if (resource === 'unsubscribe') {
+          // DELETE /api/push/unsubscribe
+          if (method === 'DELETE') {
+            await this.pushHandler.handleUnsubscribe(req, res, body);
+            return true;
+          }
+        } else if (resource === 'test') {
+          // POST /api/push/test
+          if (method === 'POST') {
+            await this.pushHandler.handleTestNotification(req, res, body);
             return true;
           }
         }
