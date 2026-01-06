@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { apiFetch } from '../../utils/apiFetch';
 import { useAgent } from '../hooks/useAgents';
 import { useAvailableModules } from '../hooks/useModules';
@@ -17,13 +17,9 @@ import ToolManager from '../components/ToolManager';
 import * as api from '../api/adminClient';
 import styles from './AgentDetailPage.module.scss';
 
-// Modules that require configuration before being added
-const MODULES_REQUIRING_CONFIG = ['bluesky'];
-
 const AgentDetailPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
-  const navigate = useNavigate();
-  const { agent, state, loading, error, updateAgent, toggleEnabled, addModule, removeModule, refetch } =
+  const { agent, state, initializedModules, loading, error, updateAgent, toggleEnabled, refetch } =
     useAgent(agentId);
   const { modules: availableModules } = useAvailableModules();
 
@@ -79,13 +75,10 @@ const AgentDetailPage: React.FC = () => {
   } = useAgentTools(agentId);
 
   const [editName, setEditName] = useState<string | null>(null);
-  const [showAddModule, setShowAddModule] = useState(false);
-  const [selectedModule, setSelectedModule] = useState('');
-  const [showModuleConfig, setShowModuleConfig] = useState<string | null>(null);
   const [expandedModule, setExpandedModule] = useState<string | null>(null);
   const [configuringModule, setConfiguringModule] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [addingModule, setAddingModule] = useState(false);
+  const [initializingModule, setInitializingModule] = useState<string | null>(null);
 
   const handleSaveName = async () => {
     if (!editName || !agent) return;
@@ -108,56 +101,17 @@ const AgentDetailPage: React.FC = () => {
     }
   };
 
-  const handleAddModule = async () => {
-    if (!selectedModule) return;
-
-    // Check if module requires configuration
-    if (MODULES_REQUIRING_CONFIG.includes(selectedModule)) {
-      setShowModuleConfig(selectedModule);
-      setShowAddModule(false);
-      return;
-    }
-
-    // Add module without config
-    setAddingModule(true);
+  const handleInitModule = async (moduleName: string) => {
+    if (!agentId) return;
+    setInitializingModule(moduleName);
     try {
-      await addModule(selectedModule);
-      setShowAddModule(false);
-      setSelectedModule('');
+      await api.initModuleForAgent(agentId, moduleName);
+      await refetch(); // Refresh to get the new state
     } catch (err) {
-      console.error('Failed to add module:', err);
-      alert(err instanceof Error ? err.message : 'Failed to add module');
+      console.error('Failed to initialize module:', err);
+      alert(err instanceof Error ? err.message : 'Failed to initialize module');
     } finally {
-      setAddingModule(false);
-    }
-  };
-
-  const handleAddModuleWithConfig = async (moduleName: string, moduleConfig: Record<string, unknown>) => {
-    setAddingModule(true);
-    try {
-      // AddModuleRequest expects { config: ModuleInitConfig }
-      await addModule(moduleName, { config: moduleConfig });
-      setShowModuleConfig(null);
-      setSelectedModule('');
-    } catch (err) {
-      console.error('Failed to add module:', err);
-      alert(err instanceof Error ? err.message : 'Failed to add module');
-    } finally {
-      setAddingModule(false);
-    }
-  };
-
-  const handleCancelModuleConfig = () => {
-    setShowModuleConfig(null);
-    setSelectedModule('');
-  };
-
-  const handleRemoveModule = async (moduleName: string) => {
-    if (!confirm(`Remove module "${moduleName}"?`)) return;
-    try {
-      await removeModule(moduleName);
-    } catch (err) {
-      console.error('Failed to remove module:', err);
+      setInitializingModule(null);
     }
   };
 
@@ -273,13 +227,6 @@ const AgentDetailPage: React.FC = () => {
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleString();
   };
-
-  // Derive module names from state keys (modules with state for this agent)
-  // Fall back to agent.modules if state is empty (backward compatibility)
-  const agentModuleNames = state && Object.keys(state).length > 0
-    ? Object.keys(state)
-    : (agent?.modules ?? []);
-  const availableToAdd = availableModules.filter((m) => !agentModuleNames.includes(m.name));
 
   if (loading) {
     return <div className={styles.loading}>Loading agent...</div>;
@@ -444,61 +391,22 @@ const AgentDetailPage: React.FC = () => {
       </div>
 
       <div className={styles.section}>
-        <div className={styles.sectionHeader}>
-          <h2 className={styles.sectionTitle}>Modules ({agentModuleNames.length})</h2>
-          <button onClick={() => setShowAddModule(true)} className={styles.addButton}>
-            + Add Module
-          </button>
-        </div>
+        <h2 className={styles.sectionTitle}>Modules ({availableModules.length})</h2>
+        <p className={styles.sectionDescription}>
+          All modules are available to all agents. Expand a module to view state or configure it.
+        </p>
 
-        {showAddModule && (
-          <div className={styles.addModuleForm}>
-            <select
-              value={selectedModule}
-              onChange={(e) => setSelectedModule(e.target.value)}
-              className={styles.select}
-              disabled={addingModule}
-            >
-              <option value="">Select a module...</option>
-              {availableToAdd.map((m) => (
-                <option key={m.name} value={m.name}>
-                  {m.name} (v{m.version})
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={handleAddModule}
-              disabled={!selectedModule || addingModule}
-              className={styles.addConfirmButton}
-            >
-              {addingModule ? 'Adding...' : 'Add'}
-            </button>
-            <button
-              onClick={() => setShowAddModule(false)}
-              className={styles.cancelButton}
-              disabled={addingModule}
-            >
-              Cancel
-            </button>
-          </div>
-        )}
-
-        {/* Module configuration forms */}
-        {showModuleConfig === 'bluesky' && (
-          <BlueskyConfigForm
-            onSubmit={(config: BlueskyConfig) => handleAddModuleWithConfig('bluesky', config as unknown as Record<string, unknown>)}
-            onCancel={handleCancelModuleConfig}
-            loading={addingModule}
-          />
-        )}
-
-        {agentModuleNames.length === 0 ? (
-          <div className={styles.empty}>No modules configured</div>
+        {availableModules.length === 0 ? (
+          <div className={styles.empty}>No modules loaded</div>
         ) : (
           <div className={styles.moduleList}>
-            {agentModuleNames.map((name) => {
-              const moduleInfo = availableModules.find((m) => m.name === name);
+            {availableModules.map((moduleInfo) => {
+              const name = moduleInfo.name;
               const moduleState = state?.[name] as Record<string, unknown> | undefined;
+              const isInitialized = initializedModules.includes(name);
+              const hasService = moduleInfo.provides.includes('service');
+              const canInitialize = hasService && !isInitialized;
+              const isInitializing = initializingModule === name;
               const isConfiguring = configuringModule === name;
               const isExpanded = expandedModule === name;
 
@@ -513,7 +421,20 @@ const AgentDetailPage: React.FC = () => {
                   >
                     <span className={styles.moduleName}>{name}</span>
                     <div className={styles.moduleMeta}>
-                      {moduleInfo && <span className={styles.versionBadge}>v{moduleInfo.version}</span>}
+                      <span className={styles.versionBadge}>v{moduleInfo.version}</span>
+                      {isInitialized && <span className={styles.activeBadge}>Active</span>}
+                      {canInitialize && (
+                        <button
+                          className={styles.initButton}
+                          disabled={isInitializing}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleInitModule(name);
+                          }}
+                        >
+                          {isInitializing ? 'Initializing...' : 'Initialize'}
+                        </button>
+                      )}
                       {!isConfiguring && (
                         <button
                           className={styles.configureButton}
@@ -533,6 +454,9 @@ const AgentDetailPage: React.FC = () => {
                   </div>
                   {(isExpanded || isConfiguring) && (
                     <div className={styles.moduleBody}>
+                      {moduleInfo.description && (
+                        <p className={styles.moduleDescription}>{moduleInfo.description}</p>
+                      )}
                       {isConfiguring ? (
                         <>
                           <div className={styles.configHeader}>
@@ -556,18 +480,14 @@ const AgentDetailPage: React.FC = () => {
                               </pre>
                             </>
                           ) : (
-                            <p className={styles.noState}>No runtime state (module not initialized)</p>
+                            <p className={styles.noState}>
+                              {hasService
+                                ? 'Service not initialized. Click "Initialize" to start.'
+                                : 'Tool-only module (no service state)'}
+                            </p>
                           )}
                         </>
                       )}
-                      <div className={styles.moduleActions}>
-                        <button
-                          onClick={() => handleRemoveModule(name)}
-                          className={styles.removeButton}
-                        >
-                          Remove Module
-                        </button>
-                      </div>
                     </div>
                   )}
                 </div>

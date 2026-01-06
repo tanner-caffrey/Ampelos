@@ -1,0 +1,33 @@
+{
+  "name": "subagent",
+  "version": "0.1.0",
+  "description": "Spawn and manage sub-agents from Letta templates with shared memory blocks",
+  "provides": ["tool", "service"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "max_subagents": {
+        "type": "number",
+        "description": "Maximum concurrent sub-agents per parent agent (0 for unlimited)",
+        "default": 10
+      },
+      "default_lifecycle": {
+        "type": "string",
+        "enum": ["ephemeral", "persistent"],
+        "description": "Default lifecycle for sub-agents",
+        "default": "ephemeral"
+      },
+      "sync_timeout_seconds": {
+        "type": "number",
+        "description": "Timeout for synchronous spawn operations",
+        "default": 300
+      },
+      "abandoned_timeout_hours": {
+        "type": "number",
+        "description": "Auto-cleanup abandoned sub-agents after this many hours",
+        "default": 24
+      }
+    },
+    "additionalProperties": false
+  }
+}

@@ -14,7 +14,6 @@ import type {
   CreateAgentFromTemplateRequest,
   UpdateAgentRequest,
   AvailableModule,
-  AddModuleRequest,
   ModuleInitConfig,
   AgentTemplate,
   TemplateInfo,
@@ -50,7 +49,11 @@ export async function fetchAgents(): Promise<{ agents: AgentDefinition[] }> {
   return handleResponse(response);
 }
 
-export async function fetchAgent(agentId: string): Promise<{ agent: AgentDefinition; state?: Record<string, unknown> }> {
+export async function fetchAgent(agentId: string): Promise<{
+  agent: AgentDefinition;
+  state?: Record<string, unknown>;
+  initializedModules?: string[];
+}> {
   const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}`);
   return handleResponse(response);
 }
@@ -137,35 +140,15 @@ export async function fetchModuleSchema(
   return handleResponse(response);
 }
 
-export async function fetchAgentModules(
-  agentId: string
-): Promise<{ modules: string[] }> {
-  const response = await apiFetch(`${API_BASE}/agents/${encodeURIComponent(agentId)}/modules`);
-  return handleResponse(response);
-}
-
-export async function addModuleToAgent(
+export async function initModuleForAgent(
   agentId: string,
-  moduleName: string,
-  config?: AddModuleRequest
-): Promise<{ modules: string[] }> {
+  moduleName: string
+): Promise<{ state: Record<string, unknown> }> {
   const response = await apiFetch(
-    `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules/${encodeURIComponent(moduleName)}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config ?? {}),
-    }
+    `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules/${encodeURIComponent(moduleName)}/init`,
+    { method: 'POST' }
   );
   return handleResponse(response);
-}
-
-export async function removeModuleFromAgent(agentId: string, moduleName: string): Promise<void> {
-  const response = await apiFetch(
-    `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules/${encodeURIComponent(moduleName)}`,
-    { method: 'DELETE' }
-  );
-  await handleResponse(response);
 }
 
 // =============================================================================

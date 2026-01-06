@@ -140,15 +140,24 @@ export class ModuleLoader {
       // Load service factory if module provides service
       if (manifest.provides.includes('service')) {
         try {
+          log.info(`Loading service for module: ${manifest.name} from ${modulePath}`);
           const serviceModule = await import(join(modulePath, 'service.ts'));
+          log.info(`Service module loaded for ${manifest.name}`, {
+            hasDefault: !!serviceModule.default,
+            defaultType: typeof serviceModule.default,
+            hasService: !!serviceModule.Service
+          });
           if (serviceModule.default && typeof serviceModule.default === 'function') {
             loadedModule.serviceFactory = () => new serviceModule.default() as BaseService;
+            log.info(`Created service factory for ${manifest.name} via default export`);
           } else if (serviceModule.Service) {
             loadedModule.serviceFactory = () => new serviceModule.Service() as BaseService;
+            log.info(`Created service factory for ${manifest.name} via Service export`);
           } else {
             throw new Error('Service module must export a default class or Service class');
           }
         } catch (error) {
+          log.error(`Failed to load service for ${manifest.name}`, { error: error instanceof Error ? error.message : String(error) });
           loadedModule.error = `Failed to load service: ${error instanceof Error ? error.message : String(error)}`;
           this.loadedModules.set(manifest.name, loadedModule);
           return;

@@ -129,24 +129,22 @@ export class LettaClientWrapper {
     const sdkOptions: {
       baseURL?: string;
       apiKey?: string;
-      defaultHeaders?: Record<string, string>;
+      projectID?: string;
     } = {};
 
     if (config.backend === 'cloud') {
       // For Letta Cloud:
       // - Use default cloud URL (https://api.letta.com) unless overridden
       // - Requires API key
-      // - May include project ID in headers
+      // - Use native projectID option for project scoping
       if (config.baseUrl) {
         sdkOptions.baseURL = config.baseUrl;
       }
       sdkOptions.apiKey = config.token;
 
-      // Add project ID header if specified
+      // Use SDK's native projectID option
       if (config.projectId) {
-        sdkOptions.defaultHeaders = {
-          'X-Project-ID': config.projectId
-        };
+        sdkOptions.projectID = config.projectId;
       }
     } else {
       // For self-hosted:

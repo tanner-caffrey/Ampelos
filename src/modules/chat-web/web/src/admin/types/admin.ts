@@ -64,10 +64,6 @@ export interface AvailableModule {
   configSchema?: Record<string, unknown>;
 }
 
-export interface AddModuleRequest {
-  config?: ModuleInitConfig;
-}
-
 // =============================================================================
 // Template Types
 // =============================================================================

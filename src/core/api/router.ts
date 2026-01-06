@@ -276,6 +276,14 @@ export class AdminAPIRouter {
             return true;
           }
         }
+
+        if (subResource === 'modules' && configPath === 'init') {
+          // /api/admin/agents/:agentId/modules/:moduleName/init
+          if (method === 'POST') {
+            await this.moduleHandler.handleInitModule(req, res, agentId, moduleName);
+            return true;
+          }
+        }
       }
     }
 

@@ -108,11 +108,15 @@ export class AgentAPIHandler {
       const stateManager = this.serviceManager.getStateManager();
       const state = await stateManager.getAgentStates(agentId);
 
+      // Include list of initialized modules (more reliable than DB state alone)
+      const initializedModules = this.serviceManager.getInitializedServicesForAgent(createAgentId(agentId));
+
       const response: APIResponse = {
         success: true,
         data: {
           agent,
           state,
+          initializedModules,
         },
       };
       this.sendJson(res, 200, response);

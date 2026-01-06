@@ -282,6 +282,64 @@ export class ModuleAPIHandler {
   }
 
   /**
+   * POST /api/admin/agents/:agentId/modules/:moduleName/init - Initialize module for agent
+   * Manually initializes a module's service for this agent without needing a tool call.
+   * Only works for modules that provide a 'service'.
+   */
+  async handleInitModule(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    agentId: string,
+    moduleName: string
+  ): Promise<void> {
+    try {
+      const agent = await this.store.getAgent(agentId);
+      if (!agent) {
+        this.sendError(res, 404, `Agent ${agentId} not found`);
+        return;
+      }
+
+      // Validate module exists
+      const module = this.loadedModules.get(moduleName);
+      if (!module || !module.loaded) {
+        this.sendError(res, 400, `Module ${moduleName} is not available`);
+        return;
+      }
+
+      // Check if module provides a service
+      if (!module.manifest.provides.includes('service')) {
+        this.sendError(res, 400, `Module ${moduleName} does not provide a service and cannot be initialized`);
+        return;
+      }
+
+      // Check if already initialized
+      if (this.serviceManager.isAgentInitialized(agentId as AgentId, moduleName)) {
+        this.sendError(res, 400, `Module ${moduleName} is already initialized for agent ${agentId}`);
+        return;
+      }
+
+      log.info('Initializing module for agent', { moduleName, agentId });
+
+      // Initialize the module
+      await this.serviceManager.ensureAgentInitialized(agentId as AgentId, moduleName);
+
+      // Get the new state
+      const stateManager = this.serviceManager.getStateManager();
+      const state = stateManager.getServiceState(agentId as AgentId, moduleName);
+
+      const response: APIResponse = {
+        success: true,
+        message: `Module ${moduleName} initialized for agent ${agentId}`,
+        data: { state: state.get() || {} },
+      };
+      this.sendJson(res, 200, response);
+    } catch (error) {
+      log.error('Failed to initialize module', { moduleName, agentId, error: error instanceof Error ? error.message : String(error) });
+      this.sendError(res, 500, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  /**
    * GET /api/admin/modules - List available modules
    */
   async handleListAvailableModules(

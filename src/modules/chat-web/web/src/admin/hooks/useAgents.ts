@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import type { AgentDefinition, CreateAgentRequest, UpdateAgentRequest, AddModuleRequest } from '../types/admin';
+import type { AgentDefinition, CreateAgentRequest, UpdateAgentRequest } from '../types/admin';
 import * as api from '../api/adminClient';
 
 export function useAgents() {
@@ -76,6 +76,7 @@ export function useAgents() {
 export function useAgent(agentId: string | undefined) {
   const [agent, setAgent] = useState<AgentDefinition | null>(null);
   const [state, setState] = useState<Record<string, unknown> | null>(null);
+  const [initializedModules, setInitializedModules] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,6 +84,7 @@ export function useAgent(agentId: string | undefined) {
     if (!agentId) {
       setAgent(null);
       setState(null);
+      setInitializedModules([]);
       setLoading(false);
       return;
     }
@@ -93,6 +95,7 @@ export function useAgent(agentId: string | undefined) {
       const data = await api.fetchAgent(agentId);
       setAgent(data.agent);
       setState(data.state ?? null);
+      setInitializedModules(data.initializedModules ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load agent');
     } finally {
@@ -132,27 +135,14 @@ export function useAgent(agentId: string | undefined) {
     }
   };
 
-  const addModule = async (moduleName: string, config?: AddModuleRequest) => {
-    if (!agentId) throw new Error('No agent ID');
-    await api.addModuleToAgent(agentId, moduleName, config);
-    await loadAgent();
-  };
-
-  const removeModule = async (moduleName: string) => {
-    if (!agentId) throw new Error('No agent ID');
-    await api.removeModuleFromAgent(agentId, moduleName);
-    await loadAgent();
-  };
-
   return {
     agent,
     state,
+    initializedModules,
     loading,
     error,
     refetch: loadAgent,
     updateAgent,
     toggleEnabled,
-    addModule,
-    removeModule,
   };
 }
