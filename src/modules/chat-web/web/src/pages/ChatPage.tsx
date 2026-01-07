@@ -146,6 +146,37 @@ function ChatPage() {
     loadConversations();
   }, []);
 
+  // Refresh agent list when tab becomes visible (e.g., after admin panel changes)
+  // Preserves current selection if the agent is still available
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        try {
+          const data = await api.fetchAgents();
+          const newAgents = data.agents || [];
+          setAgents(newAgents);
+
+          // If current selection is no longer available, select first agent
+          if (selectedAgent) {
+            const stillExists = newAgents.find(a => a.agent_id === selectedAgent.agent_id);
+            if (!stillExists && newAgents.length > 0) {
+              setSelectedAgent(newAgents[0]);
+            } else if (!stillExists && newAgents.length === 0) {
+              setSelectedAgent(null);
+            }
+          } else if (newAgents.length > 0 && !selectedAgent) {
+            // No current selection, select first available
+            setSelectedAgent(newAgents[0]);
+          }
+        } catch (err) {
+          console.error('[ChatWeb] Failed to refresh agents:', err);
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [selectedAgent]);
+
   useEffect(() => {
     if (selectedAgent && !selectedConversation) {
       loadMessages();

@@ -231,6 +231,10 @@ export class AgentAPIHandler {
         enabled: request?.enabled,
       });
 
+      // Refresh the AgentRegistry cache so changes are reflected in /api/agents
+      const registry = this.serviceManager.getAgentRegistry();
+      registry.addToCache(agent);
+
       const response: APIResponse<AgentDetailResponse> = {
         success: true,
         data: { agent },
@@ -342,6 +346,10 @@ export class AgentAPIHandler {
         return;
       }
 
+      // Remove from AgentRegistry cache so the agent disappears from /api/agents
+      const registry = this.serviceManager.getAgentRegistry();
+      registry.removeFromCache(createAgentId(agentId));
+
       const response: APIResponse = {
         success: true,
         message: `Agent ${agentId} deleted successfully${deleteLetta ? ' (including Letta agent)' : ''}`,
@@ -367,6 +375,10 @@ export class AgentAPIHandler {
       }
 
       const agent = await this.store.enableAgent(agentId);
+
+      // Refresh the AgentRegistry cache so the agent appears in /api/agents
+      const registry = this.serviceManager.getAgentRegistry();
+      registry.addToCache(agent);
 
       const response: APIResponse<AgentDetailResponse> = {
         success: true,
@@ -404,6 +416,10 @@ export class AgentAPIHandler {
       }
 
       const updatedAgent = await this.store.disableAgent(agentId);
+
+      // Refresh the AgentRegistry cache so the agent is removed from /api/agents
+      const registry = this.serviceManager.getAgentRegistry();
+      registry.addToCache(updatedAgent);
 
       const response: APIResponse<AgentDetailResponse> = {
         success: true,
