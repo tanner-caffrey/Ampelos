@@ -281,6 +281,47 @@ export class BlueskyClientWrapper {
   }
 
   /**
+   * Get a thread by following the original author's reply chain
+   * Traverses from a starting post, finding each subsequent reply by the same author
+   * @param uri - Starting post URI
+   * @param maxDepth - Maximum posts to traverse (default: 20)
+   * @returns Array of posts in chronological order (starting post first)
+   */
+  async getAuthorThread(uri: string, maxDepth = 20): Promise<BlueskyPost[]> {
+    if (!this.authenticated) {
+      throw new Error('Not authenticated');
+    }
+
+    const thread: BlueskyPost[] = [];
+    let currentUri = uri;
+    let authorDid: string | null = null;
+
+    for (let i = 0; i < maxDepth; i++) {
+      const { post, replies } = await this.getPostThread(currentUri, 1);
+
+      // On first iteration, capture the author DID
+      if (i === 0) {
+        authorDid = post.author.did;
+      }
+
+      thread.push(post);
+
+      // Find the author's reply among the replies
+      const authorReply = replies.find(reply => reply.author.did === authorDid);
+
+      if (!authorReply) {
+        // No more replies from the author - thread ends here
+        break;
+      }
+
+      // Continue traversal from the author's reply
+      currentUri = authorReply.uri;
+    }
+
+    return thread;
+  }
+
+  /**
    * Map API post response to BlueskyPost
    */
   private mapPost(post: any): BlueskyPost {

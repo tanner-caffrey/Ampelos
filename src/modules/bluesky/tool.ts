@@ -89,6 +89,38 @@ ${post.text}`;
 }
 
 /**
+ * Format a thread (author's reply chain) for display
+ */
+function formatThread(posts: BlueskyPost[]): string {
+  if (posts.length === 0) {
+    return 'Empty thread.';
+  }
+
+  const author = posts[0].author.displayName
+    ? `${posts[0].author.displayName} (@${posts[0].author.handle})`
+    : `@${posts[0].author.handle}`;
+
+  let output = `Thread by ${author} (${posts.length} post${posts.length > 1 ? 's' : ''}):\n`;
+
+  for (let i = 0; i < posts.length; i++) {
+    const post = posts[i];
+    const isReply = i > 0;
+
+    output += `\n[${i + 1}/${posts.length}] ${post.createdAt}${isReply ? ' (reply)' : ''}\n`;
+    output += post.text;
+
+    // Add image info if present
+    if (post.images && post.images.length > 0) {
+      output += `\n[${post.images.length} image${post.images.length > 1 ? 's' : ''} attached]`;
+    }
+
+    output += '\n';
+  }
+
+  return output;
+}
+
+/**
  * Format a notification for display
  */
 function formatNotification(notif: BlueskyNotification): string {
@@ -306,7 +338,7 @@ export const blueskyTool: ToolDefinition = {
 **Actions:**
 - **post**: Create a new post (params: text)
 - **reply**: Reply to a post (params: text, post_uri)
-- **read**: Read content - auto-detects feed name, author handle, or post URI (params: source, limit?, replies?)
+- **read**: Read content - auto-detects feed name, author handle, or post URI (params: source, limit?, replies?, thread?)
 - **search**: Search for posts (params: query, limit?)
 - **notifications**: Get your notifications (params: limit?)
 - **list_feeds**: List configured custom feeds
@@ -349,6 +381,10 @@ export const blueskyTool: ToolDefinition = {
       replies: {
         type: 'number',
         description: 'For read post: number of replies to include'
+      },
+      thread: {
+        type: 'boolean',
+        description: 'For read post: follow the author\'s reply chain to read the full thread'
       },
       // Search params
       query: {
@@ -509,6 +545,7 @@ export const blueskyTool: ToolDefinition = {
 
           const limit = Math.min((params.limit as number) || 20, 50);
           const replyCount = (params.replies as number) || 0;
+          const readThread = params.thread as boolean;
 
           // Handle single post
           if (sourceType === 'post') {
@@ -519,6 +556,12 @@ export const blueskyTool: ToolDefinition = {
 
             if (!postUri.startsWith('at://')) {
               return errorResult(`Invalid post URI: "${source}". Expected AT URI (at://...) or Bluesky post URL (https://bsky.app/profile/.../post/...)`);
+            }
+
+            // Thread mode: traverse the author's reply chain
+            if (readThread) {
+              const threadPosts = await client.getAuthorThread(postUri, limit);
+              return successResult(formatThread(threadPosts));
             }
 
             // Get post with optional replies
