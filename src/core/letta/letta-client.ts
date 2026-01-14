@@ -126,11 +126,19 @@ export class LettaClientWrapper {
     this.config = config;
 
     // Build SDK options based on backend type
+    // IMPORTANT: maxRetries=0 prevents duplicate messages when API is slow.
+    // The SDK defaults to 2 retries with 1-minute timeout, but Letta Cloud
+    // still processes the original request, causing duplicate messages.
     const sdkOptions: {
       baseURL?: string;
       apiKey?: string;
       projectID?: string;
-    } = {};
+      maxRetries?: number;
+      timeout?: number;
+    } = {
+      maxRetries: 0,  // Disable retries - Letta processes requests even if client times out
+      timeout: 5 * 60 * 1000,  // 5 minutes - allow time for agent responses
+    };
 
     if (config.backend === 'cloud') {
       // For Letta Cloud:

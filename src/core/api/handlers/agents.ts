@@ -380,6 +380,20 @@ export class AgentAPIHandler {
       const registry = this.serviceManager.getAgentRegistry();
       registry.addToCache(agent);
 
+      // Initialize Letta agent if it has existing state (registers the ID mapping)
+      // This ensures tool calls can be routed correctly at runtime
+      try {
+        const typedAgentId = createAgentId(agentId);
+        await lettaManager.initAgent(typedAgentId);
+        log.info(`Initialized Letta agent on enable`, { agentId });
+      } catch (error) {
+        // Not a fatal error - agent may not have Letta configured yet
+        log.debug(`Could not init Letta agent on enable`, {
+          agentId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+
       const response: APIResponse<AgentDetailResponse> = {
         success: true,
         data: { agent },

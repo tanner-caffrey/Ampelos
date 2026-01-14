@@ -133,6 +133,22 @@ class ScheduledMessagesService implements BaseService {
       throw new Error('ScheduledMessages service not initialized');
     }
 
+    // Debug: detect if initAgent is being called multiple times
+    const existingTimers = this.agentTimers.get(agentId);
+    if (existingTimers && existingTimers.size > 0) {
+      log.warn('initAgent called but agent already has active timers - clearing first', {
+        agentId,
+        existingTimerCount: existingTimers.size,
+        timerIds: Array.from(existingTimers.keys())
+      });
+      // Clear all existing timers for this agent before re-initializing
+      for (const timer of existingTimers.values()) {
+        clearInterval(timer);
+        clearTimeout(timer);
+      }
+      existingTimers.clear();
+    }
+
     // Store agent config
     const typedConfig = config as ScheduledMessagesConfig;
     this.agentConfigs.set(agentId, {
@@ -316,12 +332,21 @@ class ScheduledMessagesService implements BaseService {
    * Start a recurring timer for a schedule
    */
   private startTimer(agentId: AgentId, schedule: Schedule): void {
+    const timers = this.agentTimers.get(agentId);
+    if (timers) {
+      // Clear any existing timer first to prevent duplicates
+      const existingTimer = timers.get(schedule.id);
+      if (existingTimer) {
+        clearInterval(existingTimer);
+        clearTimeout(existingTimer);
+      }
+    }
+
     const intervalMs = schedule.interval * 1000;
     const timer = setInterval(async () => {
       await this.fireSchedule(agentId, schedule);
     }, intervalMs);
 
-    const timers = this.agentTimers.get(agentId);
     if (timers) {
       timers.set(schedule.id, timer);
     }
@@ -331,12 +356,21 @@ class ScheduledMessagesService implements BaseService {
    * Start a timer with initial delay, then switch to regular interval
    */
   private startTimerWithDelay(agentId: AgentId, schedule: Schedule, delayMs: number): void {
+    const timers = this.agentTimers.get(agentId);
+    if (timers) {
+      // Clear any existing timer first to prevent duplicates
+      const existingTimer = timers.get(schedule.id);
+      if (existingTimer) {
+        clearInterval(existingTimer);
+        clearTimeout(existingTimer);
+      }
+    }
+
     const timeout = setTimeout(async () => {
       await this.fireSchedule(agentId, schedule);
       this.startTimer(agentId, schedule);
     }, delayMs);
 
-    const timers = this.agentTimers.get(agentId);
     if (timers) {
       timers.set(schedule.id, timeout);
     }
@@ -348,6 +382,16 @@ class ScheduledMessagesService implements BaseService {
    * setTimeout's 32-bit integer overflow (~24.85 days max).
    */
   private startOneTimeTimer(agentId: AgentId, schedule: Schedule, delayMs: number): void {
+    const timers = this.agentTimers.get(agentId);
+    if (timers) {
+      // Clear any existing timer first to prevent duplicates
+      const existingTimer = timers.get(schedule.id);
+      if (existingTimer) {
+        clearInterval(existingTimer);
+        clearTimeout(existingTimer);
+      }
+    }
+
     if (delayMs > MAX_TIMEOUT_MS) {
       // Delay exceeds safe setTimeout limit - chain timers
       log.info('Long delay detected, using chained timer', {

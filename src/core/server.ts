@@ -306,7 +306,11 @@ export class MCPServer {
    */
   registerLettaAgent(lettaAgentId: string, ampelosAgentId: AgentId): void {
     this.lettaAgentIdMap.set(lettaAgentId, ampelosAgentId);
-    mcpLog.info(`Registered Letta agent ${lettaAgentId} -> Ampelos agent ${ampelosAgentId}`);
+    mcpLog.info(`Registered Letta agent mapping`, {
+      lettaAgentId,
+      ampelosAgentId,
+      totalMappings: this.lettaAgentIdMap.size
+    });
   }
 
   /**
@@ -442,11 +446,22 @@ export class MCPServer {
           };
         } else {
           // Multiple agents enabled, cannot determine which to use
+          // Log diagnostic info to help debug
+          mcpLog.warn(`Multi-agent tool call failed - no agent ID resolution`, {
+            tool: name,
+            enabledAgents: enabledAgents.map(a => a.agent_id),
+            registeredLettaAgents: this.lettaAgentIdMap.size,
+            hasLettaAgentIdArg: !!(args && typeof args === 'object' && 'letta_agent_id' in args),
+            providedLettaAgentId: args && typeof args === 'object' ? (args as any).letta_agent_id : undefined
+          });
           return {
             content: [
               {
                 type: 'text',
-                text: `Error: Multiple agents enabled (${enabledAgents.map(a => a.agent_id).join(', ')}). Please specify 'agent_id' or 'letta_agent_id' in tool arguments.`,
+                text: `Error: Multiple agents enabled (${enabledAgents.map(a => a.agent_id).join(', ')}). ` +
+                  `No x-agent-id header or letta_agent_id argument found. ` +
+                  `Registered Letta mappings: ${this.lettaAgentIdMap.size}. ` +
+                  `Please specify 'agent_id' or ensure Letta sends x-agent-id header.`,
               },
             ],
             isError: true,
@@ -873,10 +888,11 @@ export class MCPServer {
 
       // Extract Letta agent ID from x-agent-id header and map to Ampelos agent ID
       const lettaAgentId = req.headers['x-agent-id'] as string | undefined;
-      if (lettaAgentId && body && typeof body === 'object') {
-        const mcpRequest = body as any;
-        // Check if this is a tool call request
-        if (mcpRequest.method === 'tools/call' && mcpRequest.params) {
+      const mcpRequest = body && typeof body === 'object' ? body as any : null;
+      const isToolCall = mcpRequest?.method === 'tools/call' && mcpRequest?.params;
+
+      if (isToolCall) {
+        if (lettaAgentId) {
           // Map Letta agent ID to Ampelos agent ID
           const ampelosAgentId = this.getAmpelosAgentIdFromLetta(lettaAgentId);
           if (ampelosAgentId) {
@@ -889,8 +905,18 @@ export class MCPServer {
               httpLog.debug(`Mapped Letta agent ${lettaAgentId} -> Ampelos agent ${ampelosAgentId}`);
             }
           } else {
-            httpLog.warn(`Letta agent ${lettaAgentId} not registered with Ampelos MCP server`);
+            httpLog.warn(`Letta agent ${lettaAgentId} not registered. Registered mappings:`, {
+              registeredCount: this.lettaAgentIdMap.size,
+              registeredIds: Array.from(this.lettaAgentIdMap.keys()),
+              receivedId: lettaAgentId
+            });
           }
+        } else {
+          // No x-agent-id header - this is the likely cause of multi-agent resolution failures
+          httpLog.debug(`Tool call without x-agent-id header`, {
+            tool: mcpRequest.params?.name,
+            hasAgentIdArg: !!mcpRequest.params?.arguments?.agent_id
+          });
         }
       }
 

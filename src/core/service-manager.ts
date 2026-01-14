@@ -11,6 +11,7 @@
  * 2. initializeAgents() - for each enabled agent, calls initAgent() on relevant services
  */
 
+import { randomUUID } from 'crypto';
 import type { AgentId, AgentMetadata } from '../types/agent.js';
 import { createAgentId } from '../types/agent.js';
 import type { BaseService, ServiceContext } from '../types/service.js';
@@ -26,6 +27,9 @@ import type { LettaManager } from './letta/index.js';
 import { createComponentLogger } from './logger.js';
 
 const log = createComponentLogger('ServiceManager');
+
+// Unique instance ID to detect multiple server processes
+const INSTANCE_ID = randomUUID().substring(0, 8);
 
 /**
  * Tracks which agents have been initialized for which services
@@ -176,6 +180,8 @@ export class ServiceManager {
    * Initialize all service singletons
    */
   async initializeServices(): Promise<void> {
+    log.info('ServiceManager initializing', { instanceId: INSTANCE_ID, pid: process.pid });
+
     // Preload global state for all namespaces that services might use
     // This prevents race conditions where services read undefined state
     await this.stateManager.preloadGlobalState(ServiceManager.GLOBAL_STATE_NAMESPACES);
@@ -226,6 +232,8 @@ export class ServiceManager {
    * This ensures polling, timers, and background tasks resume correctly.
    */
   async eagerInitializeServicesWithState(): Promise<void> {
+    log.info('Eager-initializing services with state', { instanceId: INSTANCE_ID });
+
     // Iterate over all loaded modules that provide services
     for (const [moduleName, module] of this.modules) {
       // Skip modules that don't provide a service
@@ -329,6 +337,7 @@ export class ServiceManager {
     }
 
     try {
+      log.info(`Calling initAgent for ${serviceName}`, { agentId, instanceId: INSTANCE_ID });
       await service.initAgent(agentId, effectiveConfig);
 
       // Track initialization
@@ -337,7 +346,7 @@ export class ServiceManager {
       }
       this.agentInitStatus.get(agentId)!.add(serviceName);
 
-      log.info(`Initialized ${serviceName} for ${agentId}`);
+      log.info(`Initialized ${serviceName} for ${agentId}`, { instanceId: INSTANCE_ID });
     } catch (error) {
       throw new ServiceError(
         `Failed to init ${serviceName} for ${agentId}: ${error instanceof Error ? error.message : String(error)}`,
