@@ -13,19 +13,8 @@
 
 A modular MCP (Model Context Protocol) service framework designed to provide stateful, persistent services to Letta AI agents.
 
-> **Note**: This project is in active development. APIs may change between versions.
-
-> [!CAUTION]
-> **Early Beta Disclaimer**
->
-> Ampelos is experimental software in early beta. By using this software, you acknowledge that:
->
-> - **No Warranty**: This software is provided "as is" without warranty of any kind. It may contain bugs, break unexpectedly, or not work as intended.
-> - **Token/API Costs**: Ampelos connects to LLM services (Letta, OpenAI, etc.) that may incur costs. The maintainers are **not responsible** for any API charges, token usage, or unexpected costs your agents may generate.
-> - **Data Loss**: There is no guarantee against data loss, corruption, or unintended behavior. Back up any important data.
-> - **Your Responsibility**: You are solely responsible for monitoring your agents' activity, API usage, and associated costs.
->
-> Use at your own risk. The maintainers accept no liability for any damages or costs arising from the use of this software.
+> [!IMPORTANT]
+> This project is in active early beta development. See disclaimer below.
 
 <p align="center">
   <img src="assets/chat-web-screenshot.png" alt="Ampelos Chat Web Interface" width="800">
@@ -36,6 +25,18 @@ A modular MCP (Model Context Protocol) service framework designed to provide sta
 ## About
 
 Ampelos provides a plugin-based architecture for extending Letta AI agents with persistent state, external service integrations, and MCP tool capabilities. Each module can expose tools to agents while maintaining isolated, automatically-persisted state.
+
+> [!WARNING]
+> **Early Beta Disclaimer**
+>
+> Ampelos is experimental software in early beta. By using this software, you acknowledge that:
+>
+> - **No Warranty**: This software is provided "as is" without warranty of any kind. It may contain bugs, break unexpectedly, or not work as intended.
+> - **Token/API Costs**: Ampelos connects to LLM services (Letta, OpenAI, etc.) that may incur costs. The maintainers are **not responsible** for any API charges, token usage, or unexpected costs your agents may generate.
+> - **Data Loss**: There is no guarantee against data loss, corruption, or unintended behavior. Back up any important data.
+> - **Your Responsibility**: You are solely responsible for monitoring your agents' activity, API usage, and associated costs.
+>
+> Use at your own risk. The maintainers accept no liability for any damages or costs arising from the use of this software.
 
 ## Features
 
