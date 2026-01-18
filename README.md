@@ -5,6 +5,12 @@
 
 A modular MCP (Model Context Protocol) service framework designed to provide stateful, persistent services to Letta AI agents.
 
+<p align="center">
+  <img src="assets/chat-web-screenshot.png" alt="Ampelos Chat Web Interface" width="800">
+  <br>
+  <em>Chat Web Interface — Real-time conversation with agents, live memory visualization, and multi-agent support</em>
+</p>
+
 ## About
 
 Ampelos provides a plugin-based architecture for extending Letta AI agents with persistent state, external service integrations, and MCP tool capabilities. Each module can expose tools to agents while maintaining isolated, automatically-persisted state.

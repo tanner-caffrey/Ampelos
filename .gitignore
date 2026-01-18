@@ -99,3 +99,6 @@ CLAUDE.md
 .github/workflows/cleanup-decision-graphs.yml
 .github/workflows/deploy-pages.yml
 *.png
+
+# Exception: allow images in assets folder (for README)
+!assets/*.png
