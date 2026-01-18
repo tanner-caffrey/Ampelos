@@ -151,6 +151,37 @@ export async function initModuleForAgent(
   return handleResponse(response);
 }
 
+/**
+ * Set whether a module is enabled for an agent
+ */
+export async function setModuleEnabled(
+  agentId: string,
+  moduleName: string,
+  enabled: boolean
+): Promise<{ enabled: boolean }> {
+  const response = await apiFetch(
+    `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules/${encodeURIComponent(moduleName)}/enabled`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }
+  );
+  return handleResponse(response);
+}
+
+/**
+ * Get enabled/initialized status for all modules for an agent
+ */
+export async function fetchModulesStatus(
+  agentId: string
+): Promise<{ modules: Record<string, { enabled: boolean; initialized: boolean }> }> {
+  const response = await apiFetch(
+    `${API_BASE}/agents/${encodeURIComponent(agentId)}/modules-status`
+  );
+  return handleResponse(response);
+}
+
 // =============================================================================
 // Template APIs
 // =============================================================================

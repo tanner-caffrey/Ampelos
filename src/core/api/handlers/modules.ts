@@ -49,6 +49,20 @@ interface ModuleListResponse {
 }
 
 /**
+ * Request to set module enabled status
+ */
+interface SetModuleEnabledRequest {
+  enabled: boolean;
+}
+
+/**
+ * Module status response
+ */
+interface ModuleStatusResponse {
+  modules: Record<string, { enabled: boolean; initialized: boolean }>;
+}
+
+/**
  * Module API Handler
  */
 export class ModuleAPIHandler {
@@ -105,6 +119,128 @@ export class ModuleAPIHandler {
       const response: APIResponse<ModuleListResponse> = {
         success: true,
         data: { modules: initializedModules },
+      };
+      this.sendJson(res, 200, response);
+    } catch (error) {
+      this.sendError(res, 500, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  /**
+   * GET /api/admin/agents/:agentId/modules/status - Get enabled/initialized status for all modules
+   */
+  async handleGetModulesStatus(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    agentId: string
+  ): Promise<void> {
+    try {
+      const agent = await this.store.getAgent(agentId);
+      if (!agent) {
+        this.sendError(res, 404, `Agent ${agentId} not found`);
+        return;
+      }
+
+      // Get database to access module status
+      const db = this.serviceManager.getServiceContext().getDatabase();
+
+      // Get modules that have explicit enabled status set
+      const dbStatus = db.getModulesStatusForAgent(agentId);
+
+      // Get initialized modules
+      const initializedModules = new Set(
+        this.serviceManager.getInitializedServicesForAgent(agentId as AgentId)
+      );
+
+      // Build response: for all available modules, determine their status
+      const modules: Record<string, { enabled: boolean; initialized: boolean }> = {};
+
+      for (const [name, module] of this.loadedModules) {
+        if (!module.loaded) continue;
+
+        // Check if explicitly disabled (no entry = enabled by default)
+        const isEnabled = dbStatus[name]?.enabled ?? true;
+        const isInitialized = initializedModules.has(name);
+
+        modules[name] = {
+          enabled: isEnabled,
+          initialized: isInitialized,
+        };
+      }
+
+      const response: APIResponse<ModuleStatusResponse> = {
+        success: true,
+        data: { modules },
+      };
+      this.sendJson(res, 200, response);
+    } catch (error) {
+      this.sendError(res, 500, error instanceof Error ? error.message : 'Unknown error');
+    }
+  }
+
+  /**
+   * PUT /api/admin/agents/:agentId/modules/:moduleName/enabled - Set module enabled status
+   */
+  async handleSetModuleEnabled(
+    _req: IncomingMessage,
+    res: ServerResponse,
+    agentId: string,
+    moduleName: string,
+    body: unknown
+  ): Promise<void> {
+    try {
+      const agent = await this.store.getAgent(agentId);
+      if (!agent) {
+        this.sendError(res, 404, `Agent ${agentId} not found`);
+        return;
+      }
+
+      // Validate module exists
+      const module = this.loadedModules.get(moduleName);
+      if (!module || !module.loaded) {
+        this.sendError(res, 400, `Module ${moduleName} is not available`);
+        return;
+      }
+
+      const request = body as SetModuleEnabledRequest | null;
+      if (request?.enabled === undefined) {
+        this.sendError(res, 400, '"enabled" field is required');
+        return;
+      }
+
+      const enabled = request.enabled;
+      const db = this.serviceManager.getServiceContext().getDatabase();
+
+      // Ensure there's a row to update (create if doesn't exist)
+      const existingModules = db.getAgentModules(agentId);
+      const hasRow = existingModules.some(m => m.module_name === moduleName);
+
+      if (!hasRow) {
+        // Create the row with the new enabled state
+        db.addAgentModule(agentId, moduleName, { enabled });
+      } else {
+        // Update existing row
+        db.updateAgentModule(agentId, moduleName, { enabled });
+      }
+
+      log.info(`Module ${moduleName} ${enabled ? 'enabled' : 'disabled'} for ${agentId}`);
+
+      // If disabling an active module, clean it up
+      if (!enabled && this.serviceManager.isAgentInitialized(agentId as AgentId, moduleName)) {
+        try {
+          await this.serviceManager.cleanupAgentFromService(agentId as AgentId, moduleName);
+          log.info(`Cleaned up ${moduleName} service for ${agentId}`);
+        } catch (error) {
+          log.warn(`Error cleaning up ${moduleName} for ${agentId}`, {
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+
+      const response: APIResponse = {
+        success: true,
+        message: `Module ${moduleName} ${enabled ? 'enabled' : 'disabled'} for agent ${agentId}`,
+        data: { enabled },
       };
       this.sendJson(res, 200, response);
     } catch (error) {

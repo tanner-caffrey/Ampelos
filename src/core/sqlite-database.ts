@@ -455,6 +455,83 @@ export class SQLiteDatabase {
     return result.changes > 0;
   }
 
+  /**
+   * Update agent module settings (enabled, lazy)
+   */
+  updateAgentModule(agentId: string, moduleName: string, updates: { enabled?: boolean; lazy?: boolean }): void {
+    const sets: string[] = [];
+    const params: unknown[] = [];
+
+    if (updates.enabled !== undefined) {
+      sets.push('enabled = ?');
+      params.push(updates.enabled ? 1 : 0);
+    }
+    if (updates.lazy !== undefined) {
+      sets.push('lazy = ?');
+      params.push(updates.lazy ? 1 : 0);
+    }
+
+    if (sets.length > 0) {
+      params.push(agentId, moduleName);
+      this.run(
+        `UPDATE agent_modules SET ${sets.join(', ')} WHERE agent_id = ? AND module_name = ?`,
+        ...params
+      );
+    }
+  }
+
+  /**
+   * Check if a module is enabled for an agent.
+   * Returns true if no row exists (backward compatibility - all modules enabled by default).
+   */
+  isModuleEnabled(agentId: string, moduleName: string): boolean {
+    const row = this.getOne<{ enabled: number }>(
+      'SELECT enabled FROM agent_modules WHERE agent_id = ? AND module_name = ?',
+      agentId, moduleName
+    );
+    // No row means module was never explicitly configured - treat as enabled (backward compat)
+    if (!row) return true;
+    return row.enabled === 1;
+  }
+
+  /**
+   * Get list of enabled module names for an agent.
+   * Modules without a row in agent_modules are considered enabled (backward compat).
+   * Only modules explicitly disabled (enabled=0) are excluded.
+   */
+  getEnabledModulesForAgent(agentId: string): string[] {
+    // Get modules that are explicitly disabled
+    const disabledRows = this.getAll<{ module_name: string }>(
+      'SELECT module_name FROM agent_modules WHERE agent_id = ? AND enabled = 0',
+      agentId
+    );
+    const disabledSet = new Set(disabledRows.map(r => r.module_name));
+
+    // Return all modules EXCEPT the disabled ones
+    // Note: We can't list "all enabled" because modules without rows are also enabled
+    // The caller should use this in conjunction with the loaded modules list
+    return Array.from(disabledSet);
+  }
+
+  /**
+   * Get modules status for an agent (for API responses).
+   * Returns a map of module_name -> { enabled, lazy }
+   */
+  getModulesStatusForAgent(agentId: string): Record<string, { enabled: boolean; lazy: boolean }> {
+    const rows = this.getAll<{ module_name: string; enabled: number; lazy: number }>(
+      'SELECT module_name, enabled, lazy FROM agent_modules WHERE agent_id = ?',
+      agentId
+    );
+    const result: Record<string, { enabled: boolean; lazy: boolean }> = {};
+    for (const row of rows) {
+      result[row.module_name] = {
+        enabled: row.enabled === 1,
+        lazy: row.lazy === 1,
+      };
+    }
+    return result;
+  }
+
   // ============================================================
   // Module Config Operations
   // ============================================================

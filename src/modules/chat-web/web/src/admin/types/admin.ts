@@ -35,6 +35,12 @@ export interface CreateAgentRequest {
   enabled?: boolean;
   modules?: string[];
   module_configs?: Record<string, ModuleInitConfig>;
+  /**
+   * List of modules to enable for this agent.
+   * If provided, only these modules will be enabled (all others disabled).
+   * If not provided, all modules are enabled by default.
+   */
+  enabled_modules?: string[];
 }
 
 export interface CreateAgentFromTemplateRequest {

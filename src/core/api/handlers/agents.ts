@@ -12,6 +12,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { AgentStore } from '../../agent-store.js';
 import type { ServiceManager } from '../../service-manager.js';
+import type { LoadedModule } from '../../../types/module.js';
 import type { ModuleInitConfig } from '../../../types/config.js';
 import type {
   APIResponse,
@@ -33,6 +34,12 @@ interface CreateAgentRequest {
   enabled?: boolean;
   modules?: string[];
   module_configs?: Record<string, ModuleInitConfig>;
+  /**
+   * List of modules to enable for this agent.
+   * If provided, only these modules will be enabled (all others will be disabled).
+   * If not provided, all modules are enabled by default (backward compatibility).
+   */
+  enabled_modules?: string[];
 }
 
 /**
@@ -49,10 +56,16 @@ interface UpdateAgentRequest {
 export class AgentAPIHandler {
   private store: AgentStore;
   private serviceManager: ServiceManager;
+  private loadedModules: Map<string, LoadedModule>;
 
-  constructor(store: AgentStore, serviceManager: ServiceManager) {
+  constructor(
+    store: AgentStore,
+    serviceManager: ServiceManager,
+    loadedModules?: Map<string, LoadedModule>
+  ) {
     this.store = store;
     this.serviceManager = serviceManager;
+    this.loadedModules = loadedModules ?? new Map();
   }
 
   /**
@@ -181,6 +194,26 @@ export class AgentAPIHandler {
 
       // Add agent to registry cache so LettaManager can find it
       this.serviceManager.getAgentRegistry().addToCache(agent);
+
+      // If enabled_modules is specified, set module enabled status
+      // Otherwise, all modules are enabled by default (backward compatibility)
+      if (request.enabled_modules !== undefined) {
+        const enabledSet = new Set(request.enabled_modules);
+        const db = this.serviceManager.getServiceContext().getDatabase();
+
+        // Create agent_modules rows for all available modules
+        for (const [moduleName, module] of this.loadedModules) {
+          if (!module.loaded) continue;
+
+          const isEnabled = enabledSet.has(moduleName);
+          db.addAgentModule(request.id, moduleName, { enabled: isEnabled });
+        }
+
+        log.info(`Set enabled modules for agent ${request.id}`, {
+          enabled: Array.from(enabledSet),
+          total: this.loadedModules.size,
+        });
+      }
 
       // Initialize Letta agent if Letta config was provided
       if (moduleConfigs.letta) {

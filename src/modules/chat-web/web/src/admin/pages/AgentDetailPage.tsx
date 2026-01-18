@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { apiFetch } from '../../utils/apiFetch';
 import { useAgent } from '../hooks/useAgents';
@@ -17,6 +17,11 @@ import LLMConfigSection from '../components/LLMConfigSection';
 import ToolManager from '../components/ToolManager';
 import * as api from '../api/adminClient';
 import styles from './AgentDetailPage.module.scss';
+
+// Module status type
+interface ModulesStatus {
+  [moduleName: string]: { enabled: boolean; initialized: boolean };
+}
 
 const AgentDetailPage: React.FC = () => {
   const { agentId } = useParams<{ agentId: string }>();
@@ -80,6 +85,51 @@ const AgentDetailPage: React.FC = () => {
   const [configuringModule, setConfiguringModule] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [initializingModule, setInitializingModule] = useState<string | null>(null);
+
+  // Module enabled status
+  const [modulesStatus, setModulesStatus] = useState<ModulesStatus>({});
+  const [loadingModulesStatus, setLoadingModulesStatus] = useState(false);
+  const [togglingModule, setTogglingModule] = useState<string | null>(null);
+
+  // Load modules status
+  const loadModulesStatus = useCallback(async () => {
+    if (!agentId) return;
+    setLoadingModulesStatus(true);
+    try {
+      const { modules } = await api.fetchModulesStatus(agentId);
+      setModulesStatus(modules);
+    } catch (err) {
+      console.error('Failed to load modules status:', err);
+    } finally {
+      setLoadingModulesStatus(false);
+    }
+  }, [agentId]);
+
+  // Load modules status on mount
+  useEffect(() => {
+    loadModulesStatus();
+  }, [loadModulesStatus]);
+
+  // Handle module enable/disable toggle
+  const handleToggleModuleEnabled = async (moduleName: string, enabled: boolean) => {
+    if (!agentId) return;
+    setTogglingModule(moduleName);
+    try {
+      await api.setModuleEnabled(agentId, moduleName, enabled);
+      // Update local state
+      setModulesStatus(prev => ({
+        ...prev,
+        [moduleName]: { ...prev[moduleName], enabled, initialized: enabled ? prev[moduleName]?.initialized : false },
+      }));
+      // Refetch agent data to get updated state
+      await refetch();
+    } catch (err) {
+      console.error('Failed to toggle module:', err);
+      alert(err instanceof Error ? err.message : 'Failed to toggle module');
+    } finally {
+      setTogglingModule(null);
+    }
+  };
 
   const handleSaveName = async () => {
     if (!editName || !agent) return;
@@ -416,13 +466,16 @@ const AgentDetailPage: React.FC = () => {
               const moduleState = state?.[name] as Record<string, unknown> | undefined;
               const isInitialized = initializedModules.includes(name);
               const hasService = moduleInfo.provides.includes('service');
-              const canInitialize = hasService && !isInitialized;
+              // Use modulesStatus if available, default to enabled for backward compat
+              const isEnabled = modulesStatus[name]?.enabled ?? true;
+              const canInitialize = hasService && !isInitialized && isEnabled;
               const isInitializing = initializingModule === name;
               const isConfiguring = configuringModule === name;
               const isExpanded = expandedModule === name;
+              const isToggling = togglingModule === name;
 
               return (
-                <div key={name} className={styles.moduleCard}>
+                <div key={name} className={`${styles.moduleCard} ${!isEnabled ? styles.moduleDisabled : ''}`}>
                   <div
                     className={styles.moduleHeader}
                     onClick={() => {
@@ -434,7 +487,25 @@ const AgentDetailPage: React.FC = () => {
                     <div className={styles.moduleMeta}>
                       <span className={styles.versionBadge}>v{moduleInfo.version}</span>
                       {isInitialized && <span className={styles.activeBadge}>Active</span>}
-                      {canInitialize && (
+
+                      {/* Enable/Disable toggle */}
+                      <label
+                        className={styles.enableToggle}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isEnabled}
+                          disabled={isToggling}
+                          onChange={(e) => handleToggleModuleEnabled(name, e.target.checked)}
+                        />
+                        <span className={styles.toggleLabel}>
+                          {isToggling ? '...' : (isEnabled ? 'On' : 'Off')}
+                        </span>
+                      </label>
+
+                      {/* Only show Initialize/Configure if enabled */}
+                      {isEnabled && canInitialize && (
                         <button
                           className={styles.initButton}
                           disabled={isInitializing}
@@ -446,7 +517,7 @@ const AgentDetailPage: React.FC = () => {
                           {isInitializing ? 'Initializing...' : 'Initialize'}
                         </button>
                       )}
-                      {!isConfiguring && (
+                      {isEnabled && !isConfiguring && (
                         <button
                           className={styles.configureButton}
                           onClick={(e) => {

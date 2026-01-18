@@ -251,6 +251,12 @@ export class ServiceManager {
         // Only init if agent is enabled
         if (!this.agentRegistry.isEnabled(agentId)) continue;
 
+        // Skip if module is disabled for this agent
+        if (!this.db.isModuleEnabled(agentIdStr, moduleName)) {
+          log.debug(`Skipping ${moduleName} for ${agentId} (module disabled)`);
+          continue;
+        }
+
         try {
           await this.ensureAgentInitialized(agentId, moduleName);
           log.info(`Eager-initialized ${moduleName} for ${agentId} (has existing state)`);
@@ -269,6 +275,15 @@ export class ServiceManager {
   async ensureAgentInitialized(agentId: AgentId, moduleName: string): Promise<void> {
     if (this.isAgentInitialized(agentId, moduleName)) {
       return;
+    }
+
+    // Check if module is enabled for this agent
+    if (!this.db.isModuleEnabled(agentId, moduleName)) {
+      throw new ServiceError(
+        `Module ${moduleName} is disabled for agent ${agentId}. Enable it in the admin panel first.`,
+        moduleName,
+        agentId
+      );
     }
 
     // Preload state for this agent/module combination

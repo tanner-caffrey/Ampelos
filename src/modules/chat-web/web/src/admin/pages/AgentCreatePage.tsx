@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAgentTemplates } from '../hooks/useTemplates';
+import { useAvailableModules } from '../hooks/useModules';
 import LettaConfigForm, { getDefaultLettaConfig, LettaConfig } from '../components/module-configs/LettaConfigForm';
 import SpatialConfigForm, { getDefaultSpatialConfig, SpatialConfig } from '../components/module-configs/SpatialConfigForm';
 import BodyInventoryConfigForm, { getDefaultBodyInventoryConfig, BodyInventoryConfig } from '../components/module-configs/BodyInventoryConfigForm';
@@ -9,6 +10,9 @@ import * as api from '../api/adminClient';
 import styles from './AgentCreatePage.module.scss';
 
 type CreateMode = 'manual' | 'template';
+
+// Default modules to enable for new agents
+const DEFAULT_ENABLED_MODULES = ['chat-web'];
 
 // Modules that can be configured at creation time (optional)
 const CONFIGURABLE_MODULES = [
@@ -25,6 +29,7 @@ interface ModuleConfigs {
 const AgentCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { templates } = useAgentTemplates();
+  const { modules: availableModules } = useAvailableModules();
 
   const [mode, setMode] = useState<CreateMode>('manual');
   const [creating, setCreating] = useState(false);
@@ -38,6 +43,23 @@ const AgentCreatePage: React.FC = () => {
     letta: getDefaultLettaConfig(),
   });
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+
+  // Module selection - which modules to enable for this agent
+  const [enabledModules, setEnabledModules] = useState<Set<string>>(
+    new Set(DEFAULT_ENABLED_MODULES)
+  );
+
+  const toggleModuleEnabled = (moduleName: string) => {
+    setEnabledModules(prev => {
+      const next = new Set(prev);
+      if (next.has(moduleName)) {
+        next.delete(moduleName);
+      } else {
+        next.add(moduleName);
+      }
+      return next;
+    });
+  };
 
   // Template mode state
   const [selectedTemplate, setSelectedTemplate] = useState('');
@@ -108,6 +130,7 @@ const AgentCreatePage: React.FC = () => {
         name: agentName,
         enabled,
         module_configs,
+        enabled_modules: Array.from(enabledModules),
       });
 
       navigate(`/admin/agents/${agentId}`);
@@ -241,6 +264,40 @@ const AgentCreatePage: React.FC = () => {
               config={moduleConfigs.letta}
               onChange={(config) => setModuleConfigs((prev) => ({ ...prev, letta: config }))}
             />
+          </div>
+
+          {/* Module Selection */}
+          <div className={styles.section}>
+            <h2 className={styles.sectionTitle}>Module Selection</h2>
+            <p className={styles.sectionHint}>
+              Select which modules to enable for this agent. Only enabled modules will be initialized.
+              You can change this later from the agent detail page.
+            </p>
+
+            <div className={styles.moduleSelectionList}>
+              {availableModules.map((mod) => {
+                const isChecked = enabledModules.has(mod.name);
+                return (
+                  <label
+                    key={mod.name}
+                    className={`${styles.moduleCheckboxItem} ${isChecked ? styles.checked : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => toggleModuleEnabled(mod.name)}
+                    />
+                    <div className={styles.moduleCheckboxInfo}>
+                      <span className={styles.moduleCheckboxName}>{mod.name}</span>
+                      {mod.description && (
+                        <span className={styles.moduleCheckboxDesc}>{mod.description}</span>
+                      )}
+                    </div>
+                    <span className={styles.moduleCheckboxVersion}>v{mod.version}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           {/* Optional Module Configuration */}

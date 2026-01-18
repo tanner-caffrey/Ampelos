@@ -38,7 +38,7 @@ export class AdminAPIRouter {
     loadedModules: Map<string, LoadedModule>,
     toolManager?: ToolManager
   ) {
-    this.agentHandler = new AgentAPIHandler(store, serviceManager);
+    this.agentHandler = new AgentAPIHandler(store, serviceManager, loadedModules);
     this.moduleHandler = new ModuleAPIHandler(store, serviceManager, loadedModules);
     this.templateHandler = new TemplateAPIHandler(store, templateRegistry);
     this.healthHandler = new HealthAPIHandler(db, store);
@@ -191,6 +191,13 @@ export class AdminAPIRouter {
             return true;
           }
         }
+        if (action === 'modules-status') {
+          // /api/admin/agents/:agentId/modules-status
+          if (method === 'GET') {
+            await this.moduleHandler.handleGetModulesStatus(req, res, agentId);
+            return true;
+          }
+        }
         if (action === 'tools') {
           // /api/admin/agents/:agentId/tools
           if (!this.toolsHandler) {
@@ -281,6 +288,14 @@ export class AdminAPIRouter {
           // /api/admin/agents/:agentId/modules/:moduleName/init
           if (method === 'POST') {
             await this.moduleHandler.handleInitModule(req, res, agentId, moduleName);
+            return true;
+          }
+        }
+
+        if (subResource === 'modules' && configPath === 'enabled') {
+          // /api/admin/agents/:agentId/modules/:moduleName/enabled
+          if (method === 'PUT') {
+            await this.moduleHandler.handleSetModuleEnabled(req, res, agentId, moduleName, body);
             return true;
           }
         }
