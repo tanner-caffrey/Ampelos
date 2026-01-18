@@ -91,6 +91,54 @@ Ampelos uses a modular architecture where each module can provide:
 - **Standalone Services**: Background services with no tool interface (e.g., telemetry)
 - **Paired Modules**: Tool + Service combination where the tool provides the interface and the service manages state
 
+```mermaid
+flowchart TB
+    subgraph Clients["Client Layer"]
+        ChatWeb["Chat Web UI<br/>(PWA)"]
+        MCP["MCP Clients"]
+        API["REST API"]
+    end
+
+    subgraph Core["Core Framework"]
+        Server["MCP Server<br/>(HTTP/stdio)"]
+        SM["Service Manager"]
+        LM["Letta Manager"]
+        State["State Manager<br/>(Reactive)"]
+        DB[(SQLite<br/>WAL Mode)]
+    end
+
+    subgraph Modules["Module Layer"]
+        direction LR
+        M1["chat-web"]
+        M2["bluesky"]
+        M3["spatial"]
+        M4["scheduled-<br/>messages"]
+        M5["vision"]
+        M6["...14 modules"]
+    end
+
+    subgraph Letta["Letta AI"]
+        Agent1["Agent 1"]
+        Agent2["Agent 2"]
+        Memory["3-Tier Memory<br/>(Core/Archival/Recall)"]
+    end
+
+    ChatWeb --> Server
+    MCP --> Server
+    API --> Server
+
+    Server --> SM
+    SM --> State
+    State --> DB
+    SM --> LM
+
+    SM --> Modules
+    LM --> Letta
+
+    Agent1 --> Memory
+    Agent2 --> Memory
+```
+
 ### Core Components
 
 ```
