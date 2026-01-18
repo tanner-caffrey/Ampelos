@@ -1,3 +1,4 @@
+# Warning: Unstable Module - May not function as intended
 # Letta Filesystem Module
 
 Manage Letta folders and files with patch-based modifications. Provides agents with a persistent file system within the Letta platform.
@@ -24,21 +25,29 @@ This module has no specific configuration options. It uses the agent's Letta con
 
 ## Tools Provided
 
-### Folder Operations
+The module exposes a single `filesystem` tool with action-based dispatch:
+
+### Folder Actions
 - `create_folder` - Create a new folder
-- `list_folder` - List contents of a folder
+- `list` - List contents of a folder
 - `delete_folder` - Delete a folder and its contents
+- `rename_folder` - Rename a folder
 
-### File Operations
-- `create_file` - Create a new file
-- `read_file` - Read file contents
-- `update_file` - Update file contents (full replacement)
-- `patch_file` - Apply a patch to file contents
-- `delete_file` - Delete a file
+### File Actions
+- `create` - Create a new file
+- `read` - Read file contents
+- `update` - Update file contents (full replacement)
+- `delete` - Delete a file
+- `rename` - Rename a file
 
-### Navigation
-- `get_current_folder` - Get the agent's current working folder
-- `change_folder` - Change the current working folder
+### Example Usage
+
+```json
+{ "action": "create_folder", "folder_name": "notes" }
+{ "action": "create", "filename": "todo.txt", "content": "My tasks" }
+{ "action": "list" }
+{ "action": "read", "filename": "todo.txt" }
+```
 
 ## Use Cases
 

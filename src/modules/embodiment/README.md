@@ -2,6 +2,8 @@
 
 Body parts and inventory management for Ampelos agents with Letta memory integration. Gives agents a sense of physical form and the ability to hold items.
 
+> **Note**: The module manifest name is `body_and_inventory`. Use this name in configuration.
+
 ## Features
 
 - **Body Parts**: Agents have customizable body parts with descriptors
@@ -48,19 +50,35 @@ Each part can have descriptors (key-value pairs for characteristics).
 
 ## Tools Provided
 
-### Body Management
-- View and modify body parts
-- Add/remove body part descriptors
-- Update body part characteristics
+### `manage_body` - Body Part Management
 
-### Inventory Management
-- Add items to inventory
-- Remove items from inventory
-- List current inventory
-- Inspect item details
+Actions:
+- `view` - View all body parts and their descriptors
+- `update` - Update descriptors for a body part
+- `add_part` - Add a new body part
+- `remove_part` - Remove a body part
+
+Example:
+```json
+{ "action": "update", "part_name": "face", "descriptors": { "expression": "smiling" } }
+```
+
+### `manage_inventory` - Inventory Management
+
+Actions:
+- `view` - List all items in inventory
+- `add` - Add an item to inventory
+- `remove` - Remove an item from inventory
+- `inspect` - Get details about a specific item
+
+Example:
+```json
+{ "action": "add", "name": "golden key", "description": "An ornate key with mysterious engravings" }
+```
 
 ## Use Cases
 
 - **Roleplay Agents**: Give agents a physical presence for immersive interactions
 - **Game Agents**: Manage inventory for game-like experiences
 - **Character Development**: Track agent appearance and belongings over time
+- **Embodied Agent Architecture**: Required dependency for the embodied-agent module

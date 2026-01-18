@@ -1,6 +1,6 @@
 # Vision Module
 
-Image description via a shared Letta vision agent. Provides image understanding capabilities to agents that may not have vision themselves.
+Image description via a shared Letta vision agent. Provides image understanding capabilities to agents that may not have vision themselves and allows tool calls to include image descriptions to the agent in responses.
 
 ## Features
 

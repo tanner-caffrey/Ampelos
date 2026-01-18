@@ -95,17 +95,19 @@ src/
 | Module | Type | Description |
 |--------|------|-------------|
 | [bluesky](src/modules/bluesky/) | Service + Tool | Bluesky social media integration |
-| [chat-web](src/modules/chat-web/) | Service + Tool | Web-based chat interface (PWA) |
-| [docker](src/modules/docker/) | Service + Tool | Docker container management |
-| [embodiment](src/modules/embodiment/) | Service | Agent embodiment and presence |
+| [chat-web](src/modules/chat-web/) | Service + Tool | Web-based chat interface (PWA) with push notifications |
+| [docker](src/modules/docker/) | Service + Tool | Docker container management with bidirectional messaging |
+| [embodied-agent](src/modules/embodied-agent/) | Service | Embodied agent architecture with soma and reflection |
+| [embodiment](src/modules/embodiment/) | Service + Tool | Body parts and inventory management |
 | [journal](src/modules/journal/) | Service + Tool | Agent journaling and reflection |
-| [letta-filesystem](src/modules/letta-filesystem/) | Tool | File system access for agents |
-| [multi-agent-chat](src/modules/multi-agent-chat/) | Service | Multi-agent conversation routing |
-| [reading-subscriptions](src/modules/reading-subscriptions/) | Service | RSS/content subscription management |
-| [scheduled-messages](src/modules/scheduled-messages/) | Service | Time-based message scheduling |
+| [letta-filesystem](src/modules/letta-filesystem/) | Service + Tool | File system access for agents |
+| [multi-agent-chat](src/modules/multi-agent-chat/) | Service | Multi-agent conversation routing via Letta Groups |
+| [reading-subscriptions](src/modules/reading-subscriptions/) | Service + Tool | RSS/content subscription management |
+| [scheduled-messages](src/modules/scheduled-messages/) | Service + Tool | Time-based and recurring message scheduling |
 | [spatial](src/modules/spatial/) | Service + Tool | Spatial awareness and navigation |
-| [vision](src/modules/vision/) | Service + Tool | Image description via Letta vision |
-| [web-reader](src/modules/web-reader/) | Tool | Web content fetching and parsing |
+| [subagent](src/modules/subagent/) | Service + Tool | Spawn and manage sub-agents from templates |
+| [vision](src/modules/vision/) | Service | Image description via Letta vision agent |
+| [web-reader](src/modules/web-reader/) | Service + Tool | Web content fetching and Reddit browsing |
 
 ## Configuration
 
@@ -163,8 +165,6 @@ Ampelos includes comprehensive Letta agent framework support:
 - **Self-Managed Memory** - Agents reflexively manage their own memory
 - **Template-Based Configuration** - Easy customization via templates
 
-**Quick Start Guide:** See [.docs/LETTA_QUICKSTART.md](.docs/LETTA_QUICKSTART.md)
-
 ## Module Development
 
 Modules live in `src/modules/` and require:
@@ -174,8 +174,6 @@ Modules live in `src/modules/` and require:
 - `tool.ts` - MCP tool definitions (optional)
 - `types.ts` - TypeScript type definitions
 - `index.ts` - Module exports
-
-See [.docs/design.md](.docs/design.md) for detailed architecture and development guidelines.
 
 ## Troubleshooting
 

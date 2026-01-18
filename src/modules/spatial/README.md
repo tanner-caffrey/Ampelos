@@ -71,20 +71,35 @@ If no worlds are configured, agents start in "The Void" - an empty expanse waiti
 
 ## Tools Provided
 
-### Navigation
+### `spatial` - Navigation and World Information
+
+Actions:
 - `look` - Observe current location and surroundings
 - `move` - Move to a connected location
-- `teleport` - Move directly to any location (admin)
-
-### World Information
+- `teleport` - Move directly to any location
 - `list_locations` - List all locations in current world
 - `get_location` - Get details about a specific location
-- `where_am_i` - Get agent's current location
 
-### Object Interaction (via interact tool)
-- `place_object` - Place an object in current location
-- `take_object` - Pick up an object
-- `examine_object` - Inspect an object in detail
+Example:
+```json
+{ "action": "look" }
+{ "action": "move", "destination": "kitchen" }
+{ "action": "list_locations" }
+```
+
+### `interact` - Object Interaction
+
+Actions:
+- `place` - Place an object in current location
+- `take` - Pick up an object
+- `examine` - Inspect an object in detail
+- `use` - Use an object
+
+Example:
+```json
+{ "action": "place", "name": "magic lamp", "description": "An old brass lamp" }
+{ "action": "examine", "name": "magic lamp" }
+```
 
 ## Use Cases
 

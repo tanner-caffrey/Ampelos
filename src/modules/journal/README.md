@@ -35,17 +35,26 @@ This module depends on:
 
 ## Tools Provided
 
-### Journal Management
+The module exposes a single `journal` tool with action-based dispatch:
+
+### Actions
+
 - `create_journal` - Create a new journal with a name
 - `list_journals` - List all journals owned by the agent
 - `delete_journal` - Delete a journal and all its entries
-
-### Entry Management
 - `write_entry` - Write a new journal entry
 - `edit_entry` - Edit an existing entry
 - `delete_entry` - Delete an entry
 - `read_entry` - Read a specific entry
 - `list_entries` - List entries in a journal
+
+### Example Usage
+
+```json
+{ "action": "create_journal", "name": "Daily Reflections" }
+{ "action": "write_entry", "journal_name": "Daily Reflections", "content": "Today I learned..." }
+{ "action": "list_entries", "journal_name": "Daily Reflections" }
+```
 
 ## Use Cases
 

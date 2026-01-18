@@ -1,3 +1,4 @@
+# Warning: Unstable Module - May not function as intended
 # Docker Module
 
 The Docker module provides isolated filesystem access and command execution through Docker containers. It creates a secure sandbox where AI agents can explore directories, read files, and execute shell commands without directly accessing the host system.
@@ -61,25 +62,22 @@ MCP tools for agent interaction:
 
 ## Configuration
 
-Add to your agent's configuration in `configs/agents.json`:
+Add to your agent's module configuration:
 
 ```json
 {
-  "agent_id": "my-agent",
-  "agent_name": "My Agent",
-  "services": {
-    "docker": {
-      "enabled": true,
-      "image": "alpine:latest",
-      "workspaceHost": "/path/to/workspace",
-      "workspaceContainer": "/workspace",
-      "commandTimeoutMs": 30000,
-      "maxCommandTimeoutMs": 300000,
-      "maxOutputChars": 32000,
-      "autoStart": true,
-      "autoPull": true,
-      "autoRemove": false
-    }
+  "docker": {
+    "enabled": true,
+    "image": "alpine:latest",
+    "workspaceHost": "/path/to/workspace",
+    "workspaceContainer": "/workspace",
+    "commandTimeoutMs": 30000,
+    "maxCommandTimeoutMs": 300000,
+    "maxOutputChars": 32000,
+    "autoStart": true,
+    "autoPull": true,
+    "autoRemove": false,
+    "enableBidirectional": true
   }
 }
 ```
@@ -99,6 +97,10 @@ Add to your agent's configuration in `configs/agents.json`:
 | `autoStart` | boolean | `true` | Start container on service init |
 | `autoPull` | boolean | `true` | Auto-pull image if missing |
 | `autoRemove` | boolean | `false` | Auto-remove container on stop |
+| `enableBidirectional` | boolean | `true` | Enable container-to-agent messaging via HTTP API |
+| `ampelosApiUrl` | string | (auto) | Ampelos API URL for container callbacks |
+| `ampelosApiPort` | number | `3005` | Ampelos API port for container callbacks |
+| `setupCallbackScript` | boolean | `true` | Auto-create callback scripts in workspace on start |
 
 ## Usage Examples
 
@@ -391,9 +393,30 @@ Get current configuration
 #### `getContainerInfo(): Promise<Docker.ContainerInspectInfo | null>`
 Get detailed container information from Docker
 
+## Bidirectional Communication
+
+When `enableBidirectional` is enabled (default), processes running inside the container can send messages back to the agent:
+
+### Setup
+
+On container start, callback scripts are automatically created in the workspace:
+- `ampelos-callback.sh` - Shell script for sending messages
+
+### Usage from Container
+
+```bash
+# From inside the container, send a message to the agent
+./ampelos-callback.sh "Task completed successfully!"
+
+# Or using curl directly
+curl -X POST http://host.docker.internal:3005/api/docker/callback \
+  -H "Content-Type: application/json" \
+  -d '{"agentId": "my-agent", "message": "Hello from container!"}'
+```
+
+This enables long-running processes to report progress or results back to the agent asynchronously.
+
 ## Related Documentation
 
 - [Ampelos Architecture](../../README.md)
-- [Module System](../../docs/modules.md)
 - [Docker SDK](https://github.com/apocas/dockerode)
-- [Tethys Architecture Guide](https://docs.tethys.ai/docker) (inspiration for this module)

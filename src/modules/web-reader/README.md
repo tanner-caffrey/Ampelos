@@ -29,14 +29,28 @@ Fetch web pages as clean markdown using the Jina Reader API. Converts web conten
 
 ## Tools Provided
 
-### Page Fetching
-- `read_page` - Fetch and convert a web page to markdown
-- `read_page_section` - Fetch a specific section of a page
-- `get_page_metadata` - Get page title, description, and metadata
+### `web_read` - Web Page Reading
 
-### Cache Management
-- `clear_cache` - Clear cached pages
-- `list_cached` - List currently cached URLs
+Fetch and convert web pages to clean markdown:
+
+```json
+{ "url": "https://example.com/article" }
+```
+
+Returns the page content as markdown with clutter removed.
+
+### `reddit_browse` - Reddit Browsing
+
+Browse Reddit content:
+
+```json
+{ "subreddit": "programming", "sort": "hot", "limit": 10 }
+```
+
+Parameters:
+- `subreddit` - Subreddit name (without r/)
+- `sort` - Sort order: "hot", "new", "top"
+- `limit` - Number of posts to fetch
 
 ## How It Works
 
