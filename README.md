@@ -91,6 +91,9 @@ Ampelos uses a modular architecture where each module can provide:
 - **Standalone Services**: Background services with no tool interface (e.g., telemetry)
 - **Paired Modules**: Tool + Service combination where the tool provides the interface and the service manages state
 
+<details>
+<summary><strong>📐 View Architecture Diagram</strong></summary>
+
 ```mermaid
 flowchart TB
     subgraph Clients["Client Layer"]
@@ -138,6 +141,8 @@ flowchart TB
     Agent1 --> Memory
     Agent2 --> Memory
 ```
+
+</details>
 
 ### Core Components
 
