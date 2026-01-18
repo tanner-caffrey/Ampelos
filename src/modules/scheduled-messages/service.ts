@@ -110,6 +110,10 @@ class ScheduledMessagesService implements BaseService {
   private agentTimers: Map<AgentId, Map<string, NodeJS.Timeout>> = new Map();
   private loopCallbacks: Map<AgentId, (agentId: AgentId) => void> = new Map();
 
+  // Pending catch-up schedules that need to fire after startup completes
+  // This prevents race conditions where missed schedules fire before all services are ready
+  private pendingCatchUps: Map<AgentId, Array<{ schedule: Schedule; removeAfterFire: boolean }>> = new Map();
+
   /**
    * No module dependencies - Letta is core infrastructure
    */
@@ -191,6 +195,75 @@ class ScheduledMessagesService implements BaseService {
   }
 
   /**
+   * Called after ALL services have finished initializing and server is listening.
+   * Processes any catch-up schedules that were queued during restoreTimers().
+   */
+  async onStartupComplete(agentId: AgentId): Promise<void> {
+    const catchUps = this.pendingCatchUps.get(agentId);
+    if (!catchUps || catchUps.length === 0) {
+      return;
+    }
+
+    log.info('Processing catch-up schedules after startup', {
+      agentId,
+      count: catchUps.length
+    });
+
+    // Clear the queue before processing (prevents duplicate processing if called again)
+    this.pendingCatchUps.delete(agentId);
+
+    // Process each catch-up sequentially to avoid overwhelming the agent
+    for (const { schedule, removeAfterFire } of catchUps) {
+      try {
+        if (schedule.type === 'recurring_at') {
+          // Fire the missed occurrence
+          await this.fireSchedule(agentId, schedule, false);
+
+          // Calculate and schedule next occurrence
+          if (schedule.recurring_pattern) {
+            const nextFireTime = this.calculateNextRecurringFire(schedule.recurring_pattern, new Date());
+            if (nextFireTime) {
+              // Update state with new fire_at
+              const state = this.getAgentState(agentId);
+              const stateSchedule = state.schedules[schedule.id];
+              if (stateSchedule) {
+                stateSchedule.fire_at = nextFireTime;
+                this.saveAgentState(agentId, state);
+
+                const delay = new Date(nextFireTime).getTime() - Date.now();
+                this.startRecurringAtTimer(agentId, schedule, delay);
+                log.info('Rescheduled recurring_at after catch-up fire', {
+                  scheduleId: schedule.id,
+                  agentId,
+                  next_fire_at: nextFireTime
+                });
+              }
+            }
+          }
+        } else {
+          // For all other types, just fire the schedule
+          await this.fireSchedule(agentId, schedule, removeAfterFire);
+        }
+
+        log.info('Catch-up schedule fired', {
+          scheduleId: schedule.id,
+          agentId,
+          type: schedule.type
+        });
+      } catch (error) {
+        log.error('Failed to fire catch-up schedule', {
+          scheduleId: schedule.id,
+          agentId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        // Continue processing other catch-ups even if one fails
+      }
+    }
+
+    log.info('Finished processing catch-up schedules', { agentId });
+  }
+
+  /**
    * Get state for a specific agent
    */
   private getAgentState(agentId: AgentId): ScheduledMessagesState {
@@ -208,6 +281,24 @@ class ScheduledMessagesService implements BaseService {
     if (!this.context) return;
     const state = this.context.getState<ScheduledMessagesState>(agentId, SERVICE_NAME);
     state.set(newState);
+  }
+
+  /**
+   * Queue a catch-up schedule to fire after startup completes.
+   * This prevents the race condition where missed schedules fire
+   * before all services have finished initializing.
+   */
+  private queueCatchUp(agentId: AgentId, schedule: Schedule, removeAfterFire: boolean): void {
+    if (!this.pendingCatchUps.has(agentId)) {
+      this.pendingCatchUps.set(agentId, []);
+    }
+    this.pendingCatchUps.get(agentId)!.push({ schedule, removeAfterFire });
+    log.info('Queued catch-up schedule for startup completion', {
+      scheduleId: schedule.id,
+      agentId,
+      type: schedule.type,
+      removeAfterFire
+    });
   }
 
   /**
@@ -231,9 +322,9 @@ class ScheduledMessagesService implements BaseService {
         const intervalMs = schedule.interval * 1000;
 
         if (elapsed >= intervalMs) {
-          // Missed fire, execute now then start regular timer
-          log.info('Firing missed schedule', { scheduleId: schedule.id, agentId });
-          await this.fireSchedule(agentId, schedule);
+          // Missed fire - queue for catch-up after startup completes, then start regular timer
+          log.info('Queuing missed schedule for catch-up', { scheduleId: schedule.id, agentId });
+          this.queueCatchUp(agentId, schedule, false);
           this.startTimer(agentId, schedule);
         } else {
           // Resume with remaining time
@@ -249,9 +340,9 @@ class ScheduledMessagesService implements BaseService {
           // Already fired, remove stale schedule
           schedulesToRemove.push(schedule.id);
         } else if (now >= fireTime) {
-          // Missed, fire now and remove
-          log.info('Firing missed one-time schedule', { scheduleId: schedule.id, agentId });
-          await this.fireSchedule(agentId, schedule, true);
+          // Missed - queue for catch-up after startup completes
+          log.info('Queuing missed one-time schedule for catch-up', { scheduleId: schedule.id, agentId });
+          this.queueCatchUp(agentId, schedule, true);
         } else {
           // Resume with remaining time
           const remaining = fireTime - now;
@@ -266,9 +357,9 @@ class ScheduledMessagesService implements BaseService {
           // Already fired, remove stale schedule
           schedulesToRemove.push(schedule.id);
         } else if (now >= fireTime) {
-          // Missed, fire now and remove
-          log.info('Firing missed one-time schedule', { scheduleId: schedule.id, agentId });
-          await this.fireSchedule(agentId, schedule, true);
+          // Missed - queue for catch-up after startup completes
+          log.info('Queuing missed one-time schedule for catch-up', { scheduleId: schedule.id, agentId });
+          this.queueCatchUp(agentId, schedule, true);
         } else {
           // Resume with remaining time
           const remaining = fireTime - now;
@@ -280,29 +371,16 @@ class ScheduledMessagesService implements BaseService {
         const fireTime = schedule.fire_at ? new Date(schedule.fire_at).getTime() : 0;
 
         if (now >= fireTime) {
-          // Missed occurrence - fire now, then calculate and schedule next
-          log.info('Firing missed recurring_at schedule', {
+          // Missed occurrence - queue for catch-up after startup completes
+          // The onStartupComplete handler will fire and reschedule
+          log.info('Queuing missed recurring_at schedule for catch-up', {
             scheduleId: schedule.id,
             agentId,
             missed_fire_at: schedule.fire_at
           });
 
-          // Fire the missed occurrence
-          await this.fireSchedule(agentId, schedule, false);
-
-          // Calculate next occurrence from now
-          if (schedule.recurring_pattern) {
-            const nextFireTime = this.calculateNextRecurringFire(schedule.recurring_pattern, new Date());
-            if (nextFireTime) {
-              schedule.fire_at = nextFireTime;
-              const delay = new Date(nextFireTime).getTime() - Date.now();
-              this.startRecurringAtTimer(agentId, schedule, delay);
-              log.info('Rescheduled recurring_at after missed fire', {
-                scheduleId: schedule.id,
-                next_fire_at: nextFireTime
-              });
-            }
-          }
+          // Queue the catch-up (special handling in onStartupComplete)
+          this.queueCatchUp(agentId, schedule, false);
         } else {
           // Not yet time - resume with remaining time
           const remaining = fireTime - now;
@@ -1005,6 +1083,9 @@ class ScheduledMessagesService implements BaseService {
     }
     this.agentTimers.delete(agentId);
 
+    // Clear any pending catch-ups
+    this.pendingCatchUps.delete(agentId);
+
     // Unregister loop callback
     if (this.context) {
       const lettaManager = this.context.getLettaManager?.();
@@ -1031,6 +1112,7 @@ class ScheduledMessagesService implements BaseService {
       }
     }
     this.agentTimers.clear();
+    this.pendingCatchUps.clear();
     this.loopCallbacks.clear();
     this.agentConfigs.clear();
 

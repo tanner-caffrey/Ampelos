@@ -147,4 +147,15 @@ export interface BaseService {
    * @returns Array of service names this service depends on
    */
   dependsOn?(): string[];
+
+  /**
+   * Called after ALL services have completed initAgent() and server is listening.
+   * Use for deferred work that may trigger agent responses (e.g., firing missed schedules).
+   *
+   * This hook solves the startup race condition where services call agent tools
+   * during initAgent() before other services have finished initializing.
+   *
+   * @param agentId - Agent identifier
+   */
+  onStartupComplete?(agentId: AgentId): Promise<void>;
 }

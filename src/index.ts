@@ -176,6 +176,10 @@ async function main() {
     // Start MCP server
     await server.start();
 
+    // Notify services that startup is complete (safe to trigger agent responses now)
+    await serviceManager.notifyStartupComplete();
+    mainLog.info('Services notified of startup completion');
+
     // Handle graceful shutdown
     const shutdown = async () => {
       mainLog.info('Shutting down...');

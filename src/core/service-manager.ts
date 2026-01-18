@@ -499,6 +499,39 @@ export class ServiceManager {
   }
 
   /**
+   * Notify all initialized services that startup is complete.
+   * Called after the server is listening and all services have finished initAgent().
+   *
+   * This allows services to defer work that may trigger agent responses
+   * (which could invoke tools from other services) until everything is ready.
+   */
+  async notifyStartupComplete(): Promise<void> {
+    log.info('Notifying services of startup completion', { instanceId: INSTANCE_ID });
+
+    // Iterate over all agents that have initialized services
+    for (const [agentId, serviceNames] of this.agentInitStatus) {
+      for (const serviceName of serviceNames) {
+        const service = this.services.get(serviceName);
+        if (!service?.onStartupComplete) continue;
+
+        try {
+          await service.onStartupComplete(agentId);
+          log.debug(`Startup complete notification sent`, { serviceName, agentId });
+        } catch (error) {
+          const err = error as Error;
+          log.error(`Error in onStartupComplete for ${serviceName}`, {
+            agentId,
+            error: err.message
+          });
+          // Continue notifying other services even if one fails
+        }
+      }
+    }
+
+    log.info('All services notified of startup completion');
+  }
+
+  /**
    * Get all initialized services for an agent
    */
   getInitializedServicesForAgent(agentId: AgentId): string[] {
