@@ -35,9 +35,49 @@ export interface AgentBlockInfo {
 }
 
 /**
- * Callback type for chat completion events
+ * Callback type for chat completion events (legacy - no context)
  */
 export type ChatCompleteCallback = (agentId: AgentId) => void;
+
+/**
+ * Context passed to chat completion callbacks
+ */
+export interface ChatCompleteContext {
+  /** The message that triggered the response */
+  stimulus: string;
+  /** The agent's response (extracted text) */
+  response: string;
+  /** The full response object with all messages */
+  fullResponse: ChatResponse;
+  /** Who sent the stimulus */
+  role: 'user' | 'system';
+  /** When the chat completed */
+  timestamp: string;
+}
+
+/**
+ * Callback type for chat completion events with full context
+ */
+export type ChatCompleteCallbackWithContext = (agentId: AgentId, context: ChatCompleteContext) => void | Promise<void>;
+
+/**
+ * Multi-modal content item (text or image)
+ */
+export interface LettaContentItem {
+  type: 'text' | 'image';
+  text?: string;
+  source?: {
+    type: 'url' | 'base64';
+    url?: string;
+    media_type?: string;
+    data?: string;
+  };
+}
+
+/**
+ * Message content that can be sent to Letta - either a simple string or multi-modal content
+ */
+export type LettaMessageContent = string | LettaContentItem[];
 
 /**
  * Options for chat operations

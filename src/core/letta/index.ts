@@ -30,6 +30,8 @@ export type {
   LettaState,
   AgentBlockInfo,
   ChatCompleteCallback,
+  ChatCompleteContext,
+  ChatCompleteCallbackWithContext,
   ChatOptions,
   ILettaAgentContext,
   LettaAgentConfig,
@@ -45,3 +47,17 @@ export { loadTemplate, renderTemplate, processMemoryBlock, processSystemPrompt }
 export type { TemplateVariables } from './utils/template-engine.js';
 export { inferLLMDefaults, inferEmbeddingDefaults, applyLLMDefaults, applyEmbeddingDefaults } from './utils/model-defaults.js';
 export { LettaAgentConfigSchema, MemoryBlockConfigSchema } from './utils/config-validator.js';
+
+// Agent Templates
+export {
+  AgentTemplateManager,
+  getAgentTemplateManager,
+  initializeAgentTemplates,
+} from './templates/index.js';
+export type {
+  AgentTemplate,
+  TemplateMemoryBlock,
+  TemplateVariable,
+  InstantiateOptions,
+  InstantiateResult,
+} from './templates/index.js';

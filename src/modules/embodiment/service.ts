@@ -184,7 +184,7 @@ class BodyAndInventoryService implements BaseService {
       parts[partName] = {
         name: partName,
         descriptors: { ...partConfig.descriptors },
-        states: []
+        // state is undefined by default (no special state)
       };
     }
     return parts;
@@ -208,16 +208,50 @@ class BodyAndInventoryService implements BaseService {
     try {
       const existingBlocks = await lettaContext.getMemory();
 
+      // Create body_and_inventory block
       if (!existingBlocks.body_and_inventory) {
         const initialContent = this.formatMemoryBlock(agentId);
-        await lettaContext.updateMemory('body_and_inventory', initialContent);
-        log.info(`Created memory block for agent ${agentId}`);
+        await lettaContext.addMemoryBlock('body_and_inventory', initialContent, 5000);
+        log.info(`Created body_and_inventory block for agent ${agentId}`);
+      }
+
+      // Create somatic_patterns block (shared with soma and reflection subagents)
+      if (!existingBlocks.somatic_patterns) {
+        const somaticContent = `SOMATIC PATTERNS
+
+This block records learned physical tendencies - how this body responds to situations.
+Patterns emerge over time through observation by the soma agent and consolidation by reflection.
+
+KNOWN PATTERNS:
+(None yet observed)
+
+PATTERN FORMAT:
+- [Trigger] → [Physical response]
+- Example: "Direct eye contact → slight tension in shoulders"`;
+        await lettaContext.addMemoryBlock('somatic_patterns', somaticContent, 3000);
+        log.info(`Created somatic_patterns block for agent ${agentId}`);
+      }
+
+      // Create awareness block (shared with reflection subagent)
+      if (!existingBlocks.awareness) {
+        const awarenessContent = `CURRENT AWARENESS
+
+The mind is quiet. No particular preoccupations have emerged yet.
+
+This block holds ambient consciousness - what lingers in the background of attention:
+- Thoughts that keep returning
+- Emotional residue from recent experiences
+- Things noticed but not yet processed
+
+Updated during reflection periods.`;
+        await lettaContext.addMemoryBlock('awareness', awarenessContent, 2000);
+        log.info(`Created awareness block for agent ${agentId}`);
       }
 
       state.letta_memory_block_created = true;
       this.saveAgentState(agentId, state);
     } catch (error: any) {
-      log.error(`Failed to ensure Letta memory block`, { error: error.message });
+      log.error(`Failed to ensure Letta memory blocks`, { error: error.message });
     }
   }
 
@@ -227,7 +261,7 @@ class BodyAndInventoryService implements BaseService {
 
     // Body section
     const bodyParts = Object.values(state.body.parts).filter(
-      part => Object.keys(part.descriptors).length > 0 || part.states.length > 0
+      part => Object.keys(part.descriptors).length > 0 || part.state
     );
 
     if (bodyParts.length > 0) {
@@ -236,7 +270,7 @@ class BodyAndInventoryService implements BaseService {
         const descriptorStr = Object.entries(part.descriptors)
           .map(([key, value]) => `${key}: ${value}`)
           .join(', ');
-        const stateStr = part.states.length > 0 ? ` [${part.states.join(', ')}]` : '';
+        const stateStr = part.state ? ` [${part.state}]` : '';
         const fullDesc = descriptorStr + stateStr;
         if (fullDesc) {
           lines.push(`  ${part.name}: ${fullDesc}`);
@@ -317,7 +351,7 @@ class BodyAndInventoryService implements BaseService {
       state.body.parts[partName] = {
         name: partName,
         descriptors: {},
-        states: []
+        // state is undefined by default
       };
 
       this.saveAgentState(agentId, state);
@@ -332,7 +366,7 @@ class BodyAndInventoryService implements BaseService {
     parts: Array<{
       name: string;
       descriptors?: Record<string, string>;
-      states?: string[];
+      state?: string;
     }>
   ): Promise<{ success: boolean; message: string; parts?: BodyPart[]; skipped?: string[] }> {
     return this.withLock(agentId, async () => {
@@ -349,7 +383,7 @@ class BodyAndInventoryService implements BaseService {
         const part: BodyPart = {
           name: partData.name,
           descriptors: partData.descriptors || {},
-          states: partData.states || []
+          state: partData.state,
         };
 
         state.body.parts[partData.name] = part;
@@ -416,7 +450,10 @@ class BodyAndInventoryService implements BaseService {
     });
   }
 
-  async addBodyState(agentId: AgentId, partName: string, bodyState: string): Promise<{ success: boolean; message: string }> {
+  /**
+   * Set the state of a body part (overwrites any existing state)
+   */
+  async setBodyState(agentId: AgentId, partName: string, bodyState: string): Promise<{ success: boolean; message: string }> {
     return this.withLock(agentId, async () => {
       const state = this.getAgentState(agentId);
       const part = state.body.parts[partName];
@@ -425,19 +462,22 @@ class BodyAndInventoryService implements BaseService {
         return { success: false, message: `Body part '${partName}' not found. Create it first.` };
       }
 
-      if (part.states.includes(bodyState)) {
-        return { success: false, message: `State '${bodyState}' already exists on ${partName}` };
-      }
-
-      part.states.push(bodyState);
+      const previousState = part.state;
+      part.state = bodyState;
       this.saveAgentState(agentId, state);
       await this.updateLettaMemoryBlock(agentId);
 
-      return { success: true, message: `Added state '${bodyState}' to ${partName}` };
+      if (previousState) {
+        return { success: true, message: `Set state of ${partName} to '${bodyState}' (was '${previousState}')` };
+      }
+      return { success: true, message: `Set state of ${partName} to '${bodyState}'` };
     });
   }
 
-  async removeBodyState(agentId: AgentId, partName: string, bodyState: string): Promise<{ success: boolean; message: string }> {
+  /**
+   * Clear the state of a body part (sets to undefined/neutral)
+   */
+  async clearBodyState(agentId: AgentId, partName: string): Promise<{ success: boolean; message: string }> {
     return this.withLock(agentId, async () => {
       const state = this.getAgentState(agentId);
       const part = state.body.parts[partName];
@@ -446,16 +486,16 @@ class BodyAndInventoryService implements BaseService {
         return { success: false, message: `Body part '${partName}' not found` };
       }
 
-      const index = part.states.indexOf(bodyState);
-      if (index === -1) {
-        return { success: false, message: `State '${bodyState}' not found on ${partName}` };
+      if (!part.state) {
+        return { success: false, message: `Body part '${partName}' has no state to clear` };
       }
 
-      part.states.splice(index, 1);
+      const previousState = part.state;
+      delete part.state;
       this.saveAgentState(agentId, state);
       await this.updateLettaMemoryBlock(agentId);
 
-      return { success: true, message: `Removed state '${bodyState}' from ${partName}` };
+      return { success: true, message: `Cleared state '${previousState}' from ${partName}` };
     });
   }
 

@@ -5,7 +5,7 @@ import styles from './ModuleConfigForm.module.scss';
 interface BodyPart {
   name: string;
   descriptors: Record<string, string>;
-  states: string[];
+  state?: string;  // Single state with overwrite semantics
 }
 
 interface InventoryItem {
@@ -137,17 +137,17 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
     await performAction('removeBodyDescriptor', { partName, key });
   };
 
-  const handleAddState = async () => {
+  const handleSetState = async () => {
     if (!newStatePart || !newStateValue.trim()) return;
-    const success = await performAction('addBodyState', {
+    const success = await performAction('setBodyState', {
       partName: newStatePart,
       bodyState: newStateValue.trim(),
     });
     if (success) setNewStateValue('');
   };
 
-  const handleRemoveState = async (partName: string, bodyState: string) => {
-    await performAction('removeBodyState', { partName, bodyState });
+  const handleClearState = async (partName: string) => {
+    await performAction('clearBodyState', { partName });
   };
 
   // Inventory actions
@@ -306,10 +306,10 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
             </div>
           )}
 
-          {/* Add State */}
+          {/* Set State */}
           {bodyParts.length > 0 && (
             <div className={styles.section}>
-              <h4 className={styles.sectionTitle}>Add State</h4>
+              <h4 className={styles.sectionTitle}>Set State</h4>
               <div className={styles.fieldRow}>
                 <select
                   value={newStatePart}
@@ -320,7 +320,7 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
                   <option value="">Select part...</option>
                   {bodyParts.map((part) => (
                     <option key={part.name} value={part.name}>
-                      {part.name}
+                      {part.name}{part.state ? ` (current: ${part.state})` : ''}
                     </option>
                   ))}
                 </select>
@@ -333,12 +333,12 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
                   disabled={saving}
                 />
                 <button
-                  onClick={handleAddState}
+                  onClick={handleSetState}
                   disabled={saving || !newStatePart || !newStateValue.trim()}
                   className={styles.actionButton}
                   type="button"
                 >
-                  Add
+                  Set
                 </button>
               </div>
             </div>
@@ -374,22 +374,20 @@ const EmbodimentStateEditor: React.FC<EmbodimentStateEditorProps> = ({ agentId, 
                         ))}
                       </div>
                     )}
-                    {part.states.length > 0 && (
+                    {part.state && (
                       <div className={styles.itemDetails}>
-                        <span className={styles.subLabel}>States:</span>
-                        {part.states.map((s) => (
-                          <span key={s} className={styles.tagWarning}>
-                            {s}
-                            <button
-                              onClick={() => handleRemoveState(part.name, s)}
-                              className={styles.tagRemove}
-                              disabled={saving}
-                              type="button"
-                            >
-                              x
-                            </button>
-                          </span>
-                        ))}
+                        <span className={styles.subLabel}>State:</span>
+                        <span className={styles.tagWarning}>
+                          {part.state}
+                          <button
+                            onClick={() => handleClearState(part.name)}
+                            className={styles.tagRemove}
+                            disabled={saving}
+                            type="button"
+                          >
+                            x
+                          </button>
+                        </span>
                       </div>
                     )}
                   </div>

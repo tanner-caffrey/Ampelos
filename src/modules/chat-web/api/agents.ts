@@ -26,11 +26,12 @@ export class AgentsAPIHandler {
   ) {}
 
   /**
-   * Handle GET /api/agents - List all agents
+   * Handle GET /api/agents - List visible and enabled agents
    */
   async handleListAgents(req: IncomingMessage, res: ServerResponse): Promise<void> {
     try {
-      const enabledAgents = this.agentRegistry.getEnabledAgents();
+      // Filter out hidden subagents (soma/reflection) from the list
+      const enabledAgents = await this.agentRegistry.getVisibleEnabledAgents();
 
       const agents: AgentInfo[] = [];
 

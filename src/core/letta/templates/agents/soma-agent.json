@@ -1,0 +1,37 @@
+{
+  "name": "soma-agent",
+  "version": "1.0.0",
+  "description": "Autonomic nervous system agent - processes involuntary body responses",
+
+  "llm": "openai/gpt-4o-mini",
+  "embedding": "letta/letta-free",
+
+  "system_prompt": "soma_agent",
+
+  "memory_blocks": [
+    {
+      "label": "role",
+      "value": "You are the autonomic nervous system for {{primary_name}}. You process physiological responses that occur involuntarily - the body's reactions that happen before conscious thought. You observe what the primary agent experienced and update their body state accordingly.\n\nYou have access to shared memory blocks from the primary agent:\n- body_and_inventory: The current physical state (read/write)\n- somatic_patterns: Learned physical tendencies (read/write)",
+      "limit": 1500
+    }
+  ],
+
+  "tools": [
+    "manage_body"
+  ],
+
+  "variables": [
+    {
+      "name": "primary_name",
+      "required": true,
+      "description": "Name of the primary agent this soma serves"
+    },
+    {
+      "name": "primary_agent_id",
+      "required": true,
+      "description": "Ampelos agent ID of the primary agent"
+    }
+  ],
+
+  "skip_initial_messages": true
+}

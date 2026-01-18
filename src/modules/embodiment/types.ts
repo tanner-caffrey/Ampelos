@@ -9,7 +9,7 @@ import { z } from 'zod';
 export interface BodyPart {
   name: string;
   descriptors: Record<string, string>; // e.g., { color: "brown", length: "long" }
-  states: string[]; // e.g., ["cleaned", "injured"]
+  state?: string; // Single state with overwrite semantics (e.g., "flushed", "tense")
 }
 
 export interface BodyState {
@@ -88,8 +88,8 @@ export type BodyAction =
   | 'create_parts_bulk'
   | 'add_descriptor'
   | 'remove_descriptor'
-  | 'add_state'
-  | 'remove_state'
+  | 'set_state'
+  | 'clear_state'
   | 'get_part'
   | 'list_parts';
 

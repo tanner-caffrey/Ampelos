@@ -197,7 +197,8 @@ export class MessagesAPIHandler {
         log.debug('Sending multi-modal content', { content: debugContent });
       }
       
-      const response = await lettaClient.sendMessage(lettaAgentId, lettaContent);
+      // Use LettaManager.chat() to trigger callbacks (e.g., soma agent processing)
+      const response = await lettaManager.chat(typedAgentId, lettaContent);
 
       // Debug: log the full response structure
       log.debug('Letta response structure', { response, messageCount: response?.messages?.length || 0 });
@@ -791,6 +792,8 @@ export class MessagesAPIHandler {
       const toolCallMap = new Map<string, ToolCall>();
       // Buffer for accumulating partial JSON argument strings per tool call
       const pendingArgsBuffer = new Map<string, string>();
+      // Accumulate assistant response for callback notification
+      let accumulatedResponse = '';
       let closed = false;
 
       // Handle client disconnect
@@ -981,8 +984,11 @@ export class MessagesAPIHandler {
           } else if (messageType === 'assistant_message') {
             // Assistant message (possibly streaming tokens)
             const content = (chunk as any).content || (chunk as any).text || (chunk as any).message || '';
-            const contentStr = typeof content === 'string' ? content : 
+            const contentStr = typeof content === 'string' ? content :
               (Array.isArray(content) ? content.map((c: any) => c.text || '').join('') : '');
+
+            // Accumulate for callback notification
+            accumulatedResponse += contentStr;
 
             eventData = {
               type: 'assistant_message',
@@ -1022,6 +1028,18 @@ export class MessagesAPIHandler {
         if (!closed) {
           res.write(`data: ${JSON.stringify({ type: 'done' })}\n\n`);
         }
+
+        // Notify callbacks for soma/reflection processing
+        // Extract stimulus text from multi-modal content
+        const stimulusText = typeof lettaContent === 'string'
+          ? lettaContent
+          : lettaContent
+              .filter((item: any) => item.type === 'text' && item.text)
+              .map((item: any) => item.text)
+              .join(' ') || '[multi-modal content]';
+
+        lettaManager.notifyChatComplete(typedAgentId, stimulusText, accumulatedResponse);
+        log.debug('Notified chat callbacks after stream', { agentId, responseLength: accumulatedResponse.length });
       } catch (streamError) {
         log.error('Stream error', { error: streamError instanceof Error ? streamError.message : String(streamError) });
         if (!closed) {

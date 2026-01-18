@@ -110,6 +110,32 @@ export class AgentRegistry {
   }
 
   /**
+   * Get all visible agents (filters out hidden group members)
+   * This is what external APIs should use to list agents
+   */
+  async getVisibleAgents(): Promise<AgentMetadata[]> {
+    const visibleDefs = await this.store.getVisibleAgents();
+    const visibleIds = new Set(visibleDefs.map(d => d.id));
+    return Array.from(this.cache.values()).filter(agent => visibleIds.has(agent.agent_id));
+  }
+
+  /**
+   * Get visible and enabled agents
+   * This is what chat interfaces should use to list available agents
+   */
+  async getVisibleEnabledAgents(): Promise<AgentMetadata[]> {
+    const visible = await this.getVisibleAgents();
+    return visible.filter(agent => agent.enabled);
+  }
+
+  /**
+   * Check if an agent is visible (not hidden in a group)
+   */
+  async isAgentVisible(agentId: AgentId): Promise<boolean> {
+    return this.store.isAgentVisible(agentId);
+  }
+
+  /**
    * Check if an agent exists
    */
   hasAgent(agentId: AgentId): boolean {

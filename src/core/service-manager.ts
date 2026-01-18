@@ -152,6 +152,9 @@ export class ServiceManager {
       getLettaManager: () => {
         return this.getLettaManager();
       },
+      getDatabase: () => {
+        return this.db;
+      },
     };
 
     return this.serviceContext;

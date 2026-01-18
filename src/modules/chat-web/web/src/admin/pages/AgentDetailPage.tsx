@@ -11,6 +11,7 @@ import JsonStateEditor from '../components/module-configs/JsonStateEditor';
 import BlueskyConfigForm, { type BlueskyConfig } from '../components/module-configs/BlueskyConfigForm';
 import SpatialStateEditor from '../components/module-configs/SpatialStateEditor';
 import EmbodimentStateEditor from '../components/module-configs/EmbodimentStateEditor';
+import EmbodiedAgentConfigForm from '../components/module-configs/EmbodiedAgentConfigForm';
 import MemoryBlockEditor from '../components/MemoryBlockEditor';
 import LLMConfigSection from '../components/LLMConfigSection';
 import ToolManager from '../components/ToolManager';
@@ -208,6 +209,16 @@ const AgentDetailPage: React.FC = () => {
     if (moduleName === 'body_and_inventory' && agentId) {
       return (
         <EmbodimentStateEditor
+          agentId={agentId}
+          onClose={() => setConfiguringModule(null)}
+        />
+      );
+    }
+
+    // Embodied agent module - use config form
+    if (moduleName === 'embodied-agent' && agentId) {
+      return (
+        <EmbodiedAgentConfigForm
           agentId={agentId}
           onClose={() => setConfiguringModule(null)}
         />

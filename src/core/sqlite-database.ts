@@ -20,7 +20,7 @@ export interface SQLiteDatabaseOptions {
   verbose?: boolean;
 }
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 /**
  * SQL schema for Ampelos database
@@ -150,6 +150,33 @@ CREATE TABLE IF NOT EXISTS tool_attachments (
 );
 
 -- ============================================================
+-- AGENT GROUPS (for embodied agents and multi-agent systems)
+-- ============================================================
+
+-- Groups of agents that form one logical entity
+CREATE TABLE IF NOT EXISTS agent_groups (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    group_type TEXT NOT NULL,  -- e.g., 'embodied', 'multi-persona', etc.
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Members of a group with their roles
+CREATE TABLE IF NOT EXISTS agent_group_members (
+    group_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    letta_agent_id TEXT,       -- Letta's agent ID
+    role TEXT NOT NULL,        -- 'primary', 'soma', 'reflection', etc.
+    template_version TEXT,     -- e.g., 'my-project/soma:latest'
+    visible INTEGER NOT NULL DEFAULT 0, -- 0 = hidden, 1 = visible in lists
+    created_at TEXT NOT NULL,
+    PRIMARY KEY (group_id, agent_id),
+    FOREIGN KEY (group_id) REFERENCES agent_groups(id) ON DELETE CASCADE,
+    FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+);
+
+-- ============================================================
 -- INDEXES FOR COMMON QUERIES
 -- ============================================================
 CREATE INDEX IF NOT EXISTS idx_agents_enabled ON agents(enabled);
@@ -157,6 +184,8 @@ CREATE INDEX IF NOT EXISTS idx_agent_modules_module ON agent_modules(module_name
 CREATE INDEX IF NOT EXISTS idx_agent_service_state_updated ON agent_service_state(updated_at);
 CREATE INDEX IF NOT EXISTS idx_letta_state_letta_id ON letta_state(letta_agent_id);
 CREATE INDEX IF NOT EXISTS idx_tool_attachments_module ON tool_attachments(module_name);
+CREATE INDEX IF NOT EXISTS idx_agent_group_members_agent ON agent_group_members(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_group_members_role ON agent_group_members(group_id, role);
 `;
 
 /**
@@ -241,11 +270,39 @@ export class SQLiteDatabase {
   private runMigrations(fromVersion: number): void {
     log.info('Migrating database', { fromVersion, toVersion: SCHEMA_VERSION });
 
-    // Add migration logic here as needed
-    // Example:
-    // if (fromVersion < 2) {
-    //   this.db.exec('ALTER TABLE agents ADD COLUMN new_field TEXT');
-    // }
+    // Migration to v2: Add agent_groups tables for embodied agent architecture
+    if (fromVersion < 2) {
+      log.info('Running migration v2: Adding agent_groups tables');
+      this.db.exec(`
+        -- Groups of agents that form one logical entity
+        CREATE TABLE IF NOT EXISTS agent_groups (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            group_type TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        -- Members of a group with their roles
+        CREATE TABLE IF NOT EXISTS agent_group_members (
+            group_id TEXT NOT NULL,
+            agent_id TEXT NOT NULL,
+            letta_agent_id TEXT,
+            role TEXT NOT NULL,
+            template_version TEXT,
+            visible INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (group_id, agent_id),
+            FOREIGN KEY (group_id) REFERENCES agent_groups(id) ON DELETE CASCADE,
+            FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+        );
+
+        -- Indexes for agent groups
+        CREATE INDEX IF NOT EXISTS idx_agent_group_members_agent ON agent_group_members(agent_id);
+        CREATE INDEX IF NOT EXISTS idx_agent_group_members_role ON agent_group_members(group_id, role);
+      `);
+      log.info('Migration v2 complete: agent_groups tables created');
+    }
 
     this.setSchemaInfo('schema_version', String(SCHEMA_VERSION));
     log.info('Migration complete');
@@ -740,6 +797,169 @@ export class SQLiteDatabase {
   }
 
   // ============================================================
+  // Agent Group Operations
+  // ============================================================
+
+  /**
+   * Create an agent group
+   */
+  createAgentGroup(input: CreateAgentGroupInput): AgentGroupRow {
+    const now = new Date().toISOString();
+    this.run(
+      'INSERT INTO agent_groups (id, name, group_type, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      input.id, input.name, input.group_type, now, now
+    );
+    return this.getAgentGroup(input.id)!;
+  }
+
+  /**
+   * Get an agent group by ID
+   */
+  getAgentGroup(groupId: string): AgentGroupRow | undefined {
+    return this.getOne<AgentGroupRow>(
+      'SELECT * FROM agent_groups WHERE id = ?',
+      groupId
+    );
+  }
+
+  /**
+   * Get all agent groups
+   */
+  getAllAgentGroups(): AgentGroupRow[] {
+    return this.getAll<AgentGroupRow>('SELECT * FROM agent_groups ORDER BY name');
+  }
+
+  /**
+   * Get agent groups by type
+   */
+  getAgentGroupsByType(groupType: string): AgentGroupRow[] {
+    return this.getAll<AgentGroupRow>(
+      'SELECT * FROM agent_groups WHERE group_type = ? ORDER BY name',
+      groupType
+    );
+  }
+
+  /**
+   * Delete an agent group (CASCADE deletes members)
+   */
+  deleteAgentGroup(groupId: string): boolean {
+    const result = this.run('DELETE FROM agent_groups WHERE id = ?', groupId);
+    return result.changes > 0;
+  }
+
+  /**
+   * Add a member to an agent group
+   */
+  addGroupMember(input: AddGroupMemberInput): AgentGroupMemberRow {
+    const now = new Date().toISOString();
+    this.run(
+      `INSERT INTO agent_group_members
+       (group_id, agent_id, letta_agent_id, role, template_version, visible, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      input.group_id,
+      input.agent_id,
+      input.letta_agent_id ?? null,
+      input.role,
+      input.template_version ?? null,
+      input.visible ? 1 : 0,
+      now
+    );
+    return this.getGroupMember(input.group_id, input.agent_id)!;
+  }
+
+  /**
+   * Get a specific group member
+   */
+  getGroupMember(groupId: string, agentId: string): AgentGroupMemberRow | undefined {
+    return this.getOne<AgentGroupMemberRow>(
+      'SELECT * FROM agent_group_members WHERE group_id = ? AND agent_id = ?',
+      groupId, agentId
+    );
+  }
+
+  /**
+   * Get all members of a group
+   */
+  getGroupMembers(groupId: string): AgentGroupMemberRow[] {
+    return this.getAll<AgentGroupMemberRow>(
+      'SELECT * FROM agent_group_members WHERE group_id = ? ORDER BY role',
+      groupId
+    );
+  }
+
+  /**
+   * Get group membership for an agent (if any)
+   */
+  getAgentGroupMembership(agentId: string): AgentGroupMemberRow | undefined {
+    return this.getOne<AgentGroupMemberRow>(
+      'SELECT * FROM agent_group_members WHERE agent_id = ?',
+      agentId
+    );
+  }
+
+  /**
+   * Get the group an agent belongs to (if any)
+   */
+  getGroupForAgent(agentId: string): AgentGroupRow | undefined {
+    const membership = this.getAgentGroupMembership(agentId);
+    if (!membership) return undefined;
+    return this.getAgentGroup(membership.group_id);
+  }
+
+  /**
+   * Get a group member by role
+   */
+  getGroupMemberByRole(groupId: string, role: string): AgentGroupMemberRow | undefined {
+    return this.getOne<AgentGroupMemberRow>(
+      'SELECT * FROM agent_group_members WHERE group_id = ? AND role = ?',
+      groupId, role
+    );
+  }
+
+  /**
+   * Update a group member's Letta agent ID
+   */
+  updateGroupMemberLettaId(groupId: string, agentId: string, lettaAgentId: string): void {
+    this.run(
+      'UPDATE agent_group_members SET letta_agent_id = ? WHERE group_id = ? AND agent_id = ?',
+      lettaAgentId, groupId, agentId
+    );
+  }
+
+  /**
+   * Remove a member from a group
+   */
+  removeGroupMember(groupId: string, agentId: string): boolean {
+    const result = this.run(
+      'DELETE FROM agent_group_members WHERE group_id = ? AND agent_id = ?',
+      groupId, agentId
+    );
+    return result.changes > 0;
+  }
+
+  /**
+   * Check if an agent is visible (not hidden in a group)
+   * Returns true if agent is not in any group, or if visible=1 in their group membership
+   */
+  isAgentVisible(agentId: string): boolean {
+    const membership = this.getAgentGroupMembership(agentId);
+    if (!membership) return true; // Not in a group = visible
+    return membership.visible === 1;
+  }
+
+  /**
+   * Get all visible agents (filters out hidden group members)
+   */
+  getVisibleAgents(): AgentRow[] {
+    return this.getAll<AgentRow>(`
+      SELECT a.* FROM agents a
+      LEFT JOIN agent_group_members m ON a.id = m.agent_id
+      WHERE m.agent_id IS NULL OR m.visible = 1
+      ORDER BY a.name
+    `);
+  }
+
+  // ============================================================
   // Lifecycle
   // ============================================================
 
@@ -836,4 +1056,41 @@ export interface TemplateCacheRow {
   name: string;
   path: string;
   variables: string; // JSON array of variable names
+}
+
+// ============================================================
+// Agent Group Row Types
+// ============================================================
+
+export interface AgentGroupRow {
+  id: string;
+  name: string;
+  group_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentGroupMemberRow {
+  group_id: string;
+  agent_id: string;
+  letta_agent_id: string | null;
+  role: string;
+  template_version: string | null;
+  visible: number; // SQLite boolean (0 = hidden, 1 = visible)
+  created_at: string;
+}
+
+export interface CreateAgentGroupInput {
+  id: string;
+  name: string;
+  group_type: string;
+}
+
+export interface AddGroupMemberInput {
+  group_id: string;
+  agent_id: string;
+  letta_agent_id?: string;
+  role: string;
+  template_version?: string;
+  visible?: boolean;
 }

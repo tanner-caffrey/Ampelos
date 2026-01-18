@@ -20,7 +20,7 @@ import { Letta } from '@letta-ai/letta-client';
 import { LettaClientWrapper, AgentInfo, MemoryBlockDetailed, ChatResponse, LettaConfig } from './letta-client.js';
 import { buildAgentConfig, validateLettaConfig } from './utils/memory-builder.js';
 import type { LettaAgentConfig } from './utils/config-validator.js';
-import type { LettaState, LettaBackendType, AgentBlockInfo, ChatCompleteCallback, ChatOptions, ILettaAgentContext } from './types.js';
+import type { LettaState, LettaBackendType, AgentBlockInfo, ChatCompleteCallback, ChatCompleteContext, ChatCompleteCallbackWithContext, ChatOptions, ILettaAgentContext, LettaMessageContent } from './types.js';
 import { createComponentLogger } from '../logger.js';
 
 const log = createComponentLogger('Letta');
@@ -122,6 +122,7 @@ export class LettaManager {
   private context?: LettaManagerContext;
   private registerLettaAgentFn?: RegisterLettaAgentFn;
   private onChatCompleteCallbacks: Map<AgentId, ChatCompleteCallback[]> = new Map();
+  private onChatCompleteWithContextCallbacks: Map<AgentId, ChatCompleteCallbackWithContext[]> = new Map();
 
   /**
    * Initialize the manager (called once at startup)
@@ -594,9 +595,112 @@ export class LettaManager {
   }
 
   /**
-   * Send a message to the agent
+   * Register a callback with full context (stimulus + response)
    */
-  async chat(agentId: AgentId, message: string, options?: ChatOptions): Promise<ChatResponse> {
+  registerOnChatCompleteWithContext(agentId: AgentId, callback: ChatCompleteCallbackWithContext): void {
+    if (!this.onChatCompleteWithContextCallbacks.has(agentId)) {
+      this.onChatCompleteWithContextCallbacks.set(agentId, []);
+    }
+    this.onChatCompleteWithContextCallbacks.get(agentId)!.push(callback);
+  }
+
+  /**
+   * Unregister a chat completion callback with context
+   */
+  unregisterOnChatCompleteWithContext(agentId: AgentId, callback: ChatCompleteCallbackWithContext): void {
+    const callbacks = this.onChatCompleteWithContextCallbacks.get(agentId);
+    if (!callbacks) return;
+    const index = callbacks.indexOf(callback);
+    if (index > -1) {
+      callbacks.splice(index, 1);
+    }
+  }
+
+  /**
+   * Manually notify chat completion callbacks (for streaming scenarios)
+   * Call this after streaming completes to trigger soma/reflection processing
+   */
+  notifyChatComplete(
+    agentId: AgentId,
+    stimulus: string,
+    response: string,
+    options?: { role?: 'user' | 'system' }
+  ): void {
+    const context: ChatCompleteContext = {
+      stimulus,
+      response,
+      fullResponse: { messages: [] }, // Streaming doesn't have full response
+      role: options?.role ?? 'user',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Notify legacy listeners (no context)
+    const callbacks = this.onChatCompleteCallbacks.get(agentId) ?? [];
+    for (const callback of callbacks) {
+      try {
+        callback(agentId);
+      } catch (error) {
+        log.error('Error in chat complete callback', { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    // Notify context-aware listeners (async, fire and forget)
+    const contextCallbacks = this.onChatCompleteWithContextCallbacks.get(agentId) ?? [];
+    for (const callback of contextCallbacks) {
+      Promise.resolve(callback(agentId, context)).catch(error => {
+        log.error('Error in chat complete callback with context', { error: error instanceof Error ? error.message : String(error) });
+      });
+    }
+  }
+
+  /**
+   * Extract response text from a ChatResponse
+   */
+  private extractResponseText(response: ChatResponse): string {
+    for (const msg of response.messages) {
+      // Check for send_message tool call
+      if (
+        (msg as any).message_type === 'tool_call_message' &&
+        (msg as any).tool_call?.name === 'send_message'
+      ) {
+        try {
+          const args = JSON.parse((msg as any).tool_call.arguments || '{}');
+          if (args.message) return args.message;
+        } catch {
+          // Continue
+        }
+      }
+      // Check for assistant message
+      if ((msg as any).message_type === 'assistant_message' && (msg as any).content) {
+        return (msg as any).content;
+      }
+      // Fallback: direct content
+      if ((msg as any).content && typeof (msg as any).content === 'string') {
+        return (msg as any).content;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Extract stimulus text from multi-modal content
+   */
+  private extractStimulusText(message: LettaMessageContent): string {
+    if (typeof message === 'string') {
+      return message;
+    }
+    // Extract text from multi-modal content
+    const textParts = message
+      .filter(item => item.type === 'text' && item.text)
+      .map(item => item.text!);
+    return textParts.join(' ') || '[multi-modal content]';
+  }
+
+  /**
+   * Send a message to the agent
+   * @param message - Text string or multi-modal content array
+   */
+  async chat(agentId: AgentId, message: LettaMessageContent, options?: ChatOptions): Promise<ChatResponse> {
     const lettaAgentId = this.getLettaAgentId(agentId);
     const client = this.getClientForAgent(agentId);
     if (!client || !lettaAgentId) {
@@ -605,7 +709,16 @@ export class LettaManager {
 
     const response = await client.sendMessage(lettaAgentId, message, options);
 
-    // Notify listeners
+    // Build context for callbacks
+    const context: ChatCompleteContext = {
+      stimulus: this.extractStimulusText(message),
+      response: this.extractResponseText(response),
+      fullResponse: response,
+      role: options?.role ?? 'user',
+      timestamp: new Date().toISOString(),
+    };
+
+    // Notify legacy listeners (no context)
     const callbacks = this.onChatCompleteCallbacks.get(agentId) ?? [];
     for (const callback of callbacks) {
       try {
@@ -613,6 +726,15 @@ export class LettaManager {
       } catch (error) {
         log.error('Error in chat complete callback', { error: error instanceof Error ? error.message : String(error) });
       }
+    }
+
+    // Notify context-aware listeners (async, fire and forget)
+    const contextCallbacks = this.onChatCompleteWithContextCallbacks.get(agentId) ?? [];
+    for (const callback of contextCallbacks) {
+      // Run async callbacks without blocking
+      Promise.resolve(callback(agentId, context)).catch(error => {
+        log.error('Error in chat complete callback with context', { error: error instanceof Error ? error.message : String(error) });
+      });
     }
 
     return response;
@@ -913,6 +1035,7 @@ export class LettaManager {
    */
   async cleanupAgent(agentId: AgentId): Promise<void> {
     this.onChatCompleteCallbacks.delete(agentId);
+    this.onChatCompleteWithContextCallbacks.delete(agentId);
   }
 
   /**
@@ -920,6 +1043,7 @@ export class LettaManager {
    */
   async cleanup(): Promise<void> {
     this.onChatCompleteCallbacks.clear();
+    this.onChatCompleteWithContextCallbacks.clear();
   }
 }
 

@@ -173,6 +173,29 @@ export class AgentStore {
   }
 
   /**
+   * Get all visible agents (filters out hidden group members)
+   */
+  async getVisibleAgents(): Promise<AgentDefinition[]> {
+    const rows = this.db.getVisibleAgents();
+    return rows.map(row => this.rowToDefinition(row));
+  }
+
+  /**
+   * Check if an agent is visible (not hidden in a group)
+   */
+  async isAgentVisible(agentId: string): Promise<boolean> {
+    return this.db.isAgentVisible(agentId);
+  }
+
+  /**
+   * Get visible and enabled agents
+   */
+  async getVisibleEnabledAgents(): Promise<AgentDefinition[]> {
+    const visible = await this.getVisibleAgents();
+    return visible.filter((a) => a.enabled);
+  }
+
+  /**
    * Get module config for an agent (per-agent override).
    * All modules are available without config - this returns overrides only.
    */

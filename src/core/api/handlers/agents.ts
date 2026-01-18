@@ -71,14 +71,15 @@ export class AgentAPIHandler {
   }
 
   /**
-   * GET /api/admin/agents - List all agents
+   * GET /api/admin/agents - List visible agents (excludes hidden subagents)
    */
   async handleListAgents(
     req: IncomingMessage,
     res: ServerResponse
   ): Promise<void> {
     try {
-      const agents = await this.store.getAllAgents();
+      // Use getVisibleAgents to filter out hidden group members (soma/reflection subagents)
+      const agents = await this.store.getVisibleAgents();
       const response: APIResponse<AgentListResponse> = {
         success: true,
         data: { agents },

@@ -183,30 +183,30 @@ describe('BodyAndInventoryService', () => {
       });
     });
 
-    describe('addBodyState', () => {
-      it('should add state to body part', async () => {
+    describe('setBodyState', () => {
+      it('should set state on body part', async () => {
         const agentId = 'test-agent' as AgentId;
 
-        const result = await service.addBodyState(agentId, 'head', 'tired');
+        const result = await service.setBodyState(agentId, 'head', 'tired');
 
         expect(result.success).toBe(true);
-        expect(result.message).toContain('Added state');
+        expect(result.message).toContain('Set state');
       });
 
-      it('should fail for duplicate state', async () => {
+      it('should overwrite existing state', async () => {
         const agentId = 'test-agent' as AgentId;
 
         const agentState = createMockReactiveState<any>({
-          body: { parts: { head: { name: 'head', descriptors: {}, states: ['tired'] } } },
+          body: { parts: { head: { name: 'head', descriptors: {}, state: 'tired' } } },
           inventory: { items: {} },
           letta_memory_block_created: true
         });
         mockContext.getState.mockReturnValue(agentState);
 
-        const result = await service.addBodyState(agentId, 'head', 'tired');
+        const result = await service.setBodyState(agentId, 'head', 'alert');
 
-        expect(result.success).toBe(false);
-        expect(result.message).toContain('already exists');
+        expect(result.success).toBe(true);
+        expect(result.message).toContain("was 'tired'");
       });
     });
 

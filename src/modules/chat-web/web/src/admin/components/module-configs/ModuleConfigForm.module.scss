@@ -559,6 +559,30 @@
   margin-bottom: 1rem;
 }
 
+.success {
+  padding: 0.75rem;
+  background: rgba(57, 255, 68, 0.1);
+  border: 1px solid var(--neon-green);
+  color: var(--neon-green);
+  font-size: 12px;
+  margin-bottom: 1rem;
+}
+
+.fieldset {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+
+  legend {
+    padding: 0 0.5rem;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--neon-green);
+  }
+}
+
 .headerRow {
   display: flex;
   align-items: center;

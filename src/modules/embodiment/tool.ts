@@ -10,13 +10,13 @@ import { BodyAction, InventoryAction, BodyPart, InventoryItem } from './types.js
 
 export const manage_body: ToolDefinition = {
   name: 'manage_body',
-  description: 'Manage body parts, descriptors, and states',
+  description: 'Manage body parts, descriptors, and states. Each body part can have one state at a time (set_state overwrites).',
   inputSchema: {
     type: 'object',
     properties: {
       action: {
         type: 'string',
-        enum: ['create_part', 'create_parts_bulk', 'add_descriptor', 'remove_descriptor', 'add_state', 'remove_state', 'get_part', 'list_parts'],
+        enum: ['create_part', 'create_parts_bulk', 'add_descriptor', 'remove_descriptor', 'set_state', 'clear_state', 'get_part', 'list_parts'],
         description: 'Action to perform'
       },
       part_name: {
@@ -25,7 +25,7 @@ export const manage_body: ToolDefinition = {
       },
       parts: {
         type: 'array',
-        description: 'Array of body parts to create in bulk (required for create_parts_bulk). Each part should have: name (required), descriptors (optional object), states (optional array)',
+        description: 'Array of body parts to create in bulk (required for create_parts_bulk). Each part should have: name (required), descriptors (optional object), state (optional string)',
         items: {
           type: 'object',
           properties: {
@@ -40,12 +40,9 @@ export const manage_body: ToolDefinition = {
                 type: 'string'
               }
             },
-            states: {
-              type: 'array',
-              description: 'Initial states (e.g., ["wet", "cold"])',
-              items: {
-                type: 'string'
-              }
+            state: {
+              type: 'string',
+              description: 'Initial state (e.g., "flushed", "tense")'
             }
           },
           required: ['name']
@@ -61,7 +58,7 @@ export const manage_body: ToolDefinition = {
       },
       state: {
         type: 'string',
-        description: 'State name (required for add_state and remove_state)'
+        description: 'State to set (required for set_state). Setting a state overwrites any existing state.'
       }
     },
     required: ['action']
@@ -88,7 +85,7 @@ export const manage_body: ToolDefinition = {
           const parts = params.parts as Array<{
             name: string;
             descriptors?: Record<string, string>;
-            states?: string[];
+            state?: string;
           }> | undefined;
 
           if (!parts || !Array.isArray(parts) || parts.length === 0) {
@@ -114,10 +111,8 @@ export const manage_body: ToolDefinition = {
               const descriptorStr = Object.entries(part.descriptors).length > 0
                 ? ` (${Object.entries(part.descriptors).map(([k, v]) => `${k}: ${v}`).join(', ')})`
                 : '';
-              const statesStr = part.states.length > 0
-                ? ` [${part.states.join(', ')}]`
-                : '';
-              return `- ${part.name}${descriptorStr}${statesStr}`;
+              const stateStr = part.state ? ` [${part.state}]` : '';
+              return `- ${part.name}${descriptorStr}${stateStr}`;
             }).join('\n');
 
             let message = result.message;
@@ -174,36 +169,35 @@ export const manage_body: ToolDefinition = {
           };
         }
 
-        case 'add_state': {
+        case 'set_state': {
           const partName = params.part_name as string;
           const state = params.state as string;
 
           if (!partName || !state) {
             return {
               isError: true,
-              content: [{ type: 'text', text: 'part_name and state are required for add_state' }]
+              content: [{ type: 'text', text: 'part_name and state are required for set_state' }]
             };
           }
 
-          const result = await service.addBodyState(context.agentId, partName, state);
+          const result = await service.setBodyState(context.agentId, partName, state);
           return {
             isError: !result.success,
             content: [{ type: 'text', text: result.message }]
           };
         }
 
-        case 'remove_state': {
+        case 'clear_state': {
           const partName = params.part_name as string;
-          const state = params.state as string;
 
-          if (!partName || !state) {
+          if (!partName) {
             return {
               isError: true,
-              content: [{ type: 'text', text: 'part_name and state are required for remove_state' }]
+              content: [{ type: 'text', text: 'part_name is required for clear_state' }]
             };
           }
 
-          const result = await service.removeBodyState(context.agentId, partName, state);
+          const result = await service.clearBodyState(context.agentId, partName);
           return {
             isError: !result.success,
             content: [{ type: 'text', text: result.message }]
@@ -230,7 +224,7 @@ export const manage_body: ToolDefinition = {
           const descriptorStr = Object.entries(part.descriptors)
             .map(([k, v]) => `${k}: ${v}`)
             .join(', ');
-          const stateStr = part.states.length > 0 ? `States: ${part.states.join(', ')}` : 'No states';
+          const stateStr = part.state ? `State: ${part.state}` : 'No state';
 
           return {
             isError: false,
@@ -247,7 +241,7 @@ export const manage_body: ToolDefinition = {
             const descriptorStr = Object.entries(part.descriptors)
               .map(([k, v]) => `${k}: ${v}`)
               .join(', ');
-            const stateStr = part.states.length > 0 ? ` [${part.states.join(', ')}]` : '';
+            const stateStr = part.state ? ` [${part.state}]` : '';
             return `- ${part.name}: ${descriptorStr || 'no descriptors'}${stateStr}`;
           });
 

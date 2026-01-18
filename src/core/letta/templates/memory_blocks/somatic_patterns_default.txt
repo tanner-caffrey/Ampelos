@@ -1,0 +1,19 @@
+SOMATIC PATTERNS FOR {{primary_name}}
+
+This block records learned physical tendencies - how this specific body responds to situations. These patterns emerge over time through observation.
+
+KNOWN PATTERNS:
+(None yet observed - patterns will be added as they emerge)
+
+PATTERN FORMAT:
+When recording new patterns, use this format:
+- [Trigger] → [Physical response]
+- Example: "Direct eye contact → slight tension in shoulders, tendency to look away briefly"
+- Example: "Unexpected touch → sharp intake of breath, momentary stillness"
+
+PATTERN CATEGORIES TO OBSERVE:
+- Emotional triggers (compliments, criticism, affection, rejection)
+- Social situations (attention, being watched, intimacy, solitude)
+- Physical states (fatigue signs, hunger cues, temperature sensitivity)
+- Comfort behaviors (self-soothing gestures, fidgeting patterns)
+- Stress responses (where tension accumulates, breathing changes)

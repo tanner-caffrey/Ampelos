@@ -10,6 +10,7 @@ import type { AgentId, AgentMetadata } from './agent.js';
 import type { ReactiveState } from '../core/state-manager.js';
 import type { LettaToolDefinition } from './tool.js';
 import type { LettaManager } from '../core/letta/index.js';
+import type { Database } from '../core/database.js';
 
 /**
  * Service context provided to services during initialization
@@ -71,6 +72,12 @@ export interface ServiceContext {
    * This is the primary way to access Letta functionality
    */
   getLettaManager(): LettaManager;
+
+  /**
+   * Get the database instance for direct database operations
+   * Use sparingly - prefer getState() for most service state
+   */
+  getDatabase(): Database;
 }
 
 /**

@@ -8,7 +8,8 @@
     "ampelos": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && npm run copy-templates",
+    "copy-templates": "mkdir -p dist/core/letta/templates/memory_blocks dist/core/letta/templates/system_prompts dist/core/letta/templates/agents && cp -r src/core/letta/templates/memory_blocks/*.txt dist/core/letta/templates/memory_blocks/ && cp -r src/core/letta/templates/system_prompts/*.txt dist/core/letta/templates/system_prompts/ && cp -r src/core/letta/templates/agents/*.json dist/core/letta/templates/agents/",
     "dev": "tsx src/index.ts",
     "dev:all": "concurrently \"npm run dev\" \"npm run web:dev\" --names \"server,web\" --prefix-colors \"blue,green\"",
     "start": "node dist/index.js",

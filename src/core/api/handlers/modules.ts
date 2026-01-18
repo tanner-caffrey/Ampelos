@@ -564,7 +564,7 @@ export class ModuleAPIHandler {
 
       const request = body as {
         action: 'createBodyPart' | 'addBodyDescriptor' | 'removeBodyDescriptor' |
-                'addBodyState' | 'removeBodyState' | 'deleteBodyPart' |
+                'setBodyState' | 'clearBodyState' | 'deleteBodyPart' |
                 'addInventoryItem' | 'removeInventoryItem' | 'equipItem' | 'unequipItem' |
                 'modifyInventoryItem' | 'markItemForMemory';
         partName?: string;
@@ -625,20 +625,20 @@ export class ModuleAPIHandler {
           result = await bodyService.removeBodyDescriptor(agentId as AgentId, request.partName, request.key);
           break;
 
-        case 'addBodyState':
+        case 'setBodyState':
           if (!request.partName || !request.bodyState) {
             this.sendError(res, 400, 'partName and bodyState are required');
             return;
           }
-          result = await bodyService.addBodyState(agentId as AgentId, request.partName, request.bodyState);
+          result = await bodyService.setBodyState(agentId as AgentId, request.partName, request.bodyState);
           break;
 
-        case 'removeBodyState':
-          if (!request.partName || !request.bodyState) {
-            this.sendError(res, 400, 'partName and bodyState are required');
+        case 'clearBodyState':
+          if (!request.partName) {
+            this.sendError(res, 400, 'partName is required');
             return;
           }
-          result = await bodyService.removeBodyState(agentId as AgentId, request.partName, request.bodyState);
+          result = await bodyService.clearBodyState(agentId as AgentId, request.partName);
           break;
 
         // Inventory actions

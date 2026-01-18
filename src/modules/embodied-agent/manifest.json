@@ -1,0 +1,87 @@
+{
+  "name": "embodied-agent",
+  "version": "0.1.0",
+  "description": "Embodied agent architecture with soma processing, body daemon, and reflection",
+  "provides": ["service"],
+  "dependencies": ["body_and_inventory"],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "soma": {
+        "type": "object",
+        "description": "Soma agent configuration for involuntary responses",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable soma agent processing",
+            "default": true
+          },
+          "template": {
+            "type": "string",
+            "description": "Letta template version for soma agent (e.g., 'my-project/soma-agent:latest')"
+          },
+          "memory_variables": {
+            "type": "object",
+            "description": "Memory variables to pass to the template",
+            "additionalProperties": { "type": "string" }
+          }
+        },
+        "required": ["template"]
+      },
+      "reflection": {
+        "type": "object",
+        "description": "Reflection agent configuration for periodic self-reflection",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable reflection agent",
+            "default": true
+          },
+          "template": {
+            "type": "string",
+            "description": "Letta template version for reflection agent"
+          },
+          "memory_variables": {
+            "type": "object",
+            "description": "Memory variables to pass to the template",
+            "additionalProperties": { "type": "string" }
+          },
+          "interval_minutes": {
+            "type": "number",
+            "description": "Interval between reflection sessions",
+            "default": 60
+          }
+        },
+        "required": ["template"]
+      },
+      "body_daemon": {
+        "type": "object",
+        "description": "Body daemon configuration for state decay and autonomy",
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "Enable body daemon",
+            "default": true
+          },
+          "tick_interval_seconds": {
+            "type": "number",
+            "description": "Interval between daemon ticks",
+            "default": 300
+          },
+          "idle_threshold_seconds": {
+            "type": "number",
+            "description": "Time before agent is considered idle",
+            "default": 3600
+          }
+        }
+      },
+      "shared_blocks": {
+        "type": "array",
+        "description": "Memory block labels to share between primary and sub-agents",
+        "items": { "type": "string" },
+        "default": ["body_state"]
+      }
+    },
+    "additionalProperties": false
+  }
+}
