@@ -4,6 +4,7 @@ A modular MCP (Model Context Protocol) service framework designed to provide sta
 
 > [!IMPORTANT]
 > This project was early work and is no longer maintained.
+> Will not work with the current Letta infrastructure.
 
 <p align="center">
   <img src="assets/chat-web-screenshot.png" alt="Ampelos Chat Web Interface" width="800">
