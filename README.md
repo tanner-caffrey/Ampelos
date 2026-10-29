@@ -1,20 +1,9 @@
 # Ampelos
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
-![Status: Beta](https://img.shields.io/badge/Status-Beta-orange)
-
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
-![Letta](https://img.shields.io/badge/Letta-AI%20Agents-8B5CF6)
-![MCP](https://img.shields.io/badge/MCP-Protocol-FF6B6B)
-![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
-![PWA](https://img.shields.io/badge/PWA-Ready-5A0FC8?logo=pwa&logoColor=white)
-
 A modular MCP (Model Context Protocol) service framework designed to provide stateful, persistent services to Letta AI agents.
 
 > [!IMPORTANT]
-> This project is in active early beta development. See disclaimer below.
+> This project was early work and is no longer maintained.
 
 <p align="center">
   <img src="assets/chat-web-screenshot.png" alt="Ampelos Chat Web Interface" width="800">
